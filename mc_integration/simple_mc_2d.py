@@ -5,106 +5,136 @@ import pdb
 
 # pdb.set_trace()
 
-def drawNormalPoints(numSamples,mu,sigma):
-    from mc_utilities import drawStdNormalPoints
-
-    StdNormalPoints = drawStdNormalPoints(numSamples)
-
-    return mu + sigma*StdNormalPoints
-
-def fnc2integrate(x,fncExpnt):
-    if x < 0:
-        fncValue = 0
-    else:
-        fncValue = x**fncExpnt 
-    return fncValue
-
-def calcAnalyticIntegral(sigma,fncExpnt):
-    from scipy.special import gamma as gamma_fnc
-    from math import sqrt
-    from math import pi
-    analyticIntegral = (1/(sqrt(2*pi)*sigma)) \
-                        *0.5*gamma_fnc(0.5*(fncExpnt+1)) \
-                        *(2*sigma**2)**(0.5*(fncExpnt+1))
-#    pdb.set_trace()
-    return analyticIntegral
-
-def autoconversionRate(chi,Nc,alpha,beta):
+def autoconversionRate(TwoDSamplePoint,alpha,beta):
+    
+    chi = TwoDSamplePoint[0]
+    Nc  = TwoDSamplePoint[1]
     if chi < 0:
         fncValue = 0
     else:
         fncValue = chi**alpha * Nc**beta 
+
+#    pdb.set_trace()
+    
     return fncValue
 
-def calcAnalyticIntegral2D(muChi,sigmaChi,muNcn,sigmaNcn,rChiNcn,alpha,beta):
-    from scipy.special import gamma 
-    from math import sqrt, exp, pi, pbdv
+def calcAutoconversionIntegral(muChi,sigmaChi,muNcn,sigmaNcn,rChiNcn,alpha,beta):
+    from scipy.special import gamma, pbdv 
+    from math import sqrt, exp, pi
 
     sC = muChi/sigmaChi + rChiNcn*sigmaNcn*beta
+#    sC = muChi/sigmaChi - rChiNcn*sigmaNcn*beta
+
+    (parabCylFnc, parabCylDer) = pbdv(-alpha-1,-sC)
+#    (parabCylFnc, parabCylDer) = pbdv(-alpha-1,sC)
+
 
     analyticIntegral = (1/sqrt(2*pi))*(sigmaChi**alpha) \
                         *exp(muNcn*beta + 0.5*(sigmaNcn*beta)**2 - 0.25*sC**2) \
-                        *gamma(alpha+1)*pbdv(-alpha-1,-sC)
+                        *gamma(alpha+1)*parabCylFnc
 
 #    pdb.set_trace()
+
     return analyticIntegral
+
+def drawNormalLognormalPoints(numSamples,muN,sigmaN,muLNn,sigmaLNn,rn):
+    from mc_utilities import drawStdNormalPoints
+    from numpy import zeros, exp, dot
+    from numpy.linalg import cholesky
+
+    stdNormalPoints = zeros((numSamples,2))
+    
+    stdNormalPoints[:,0] = drawStdNormalPoints(numSamples)
+    stdNormalPoints[:,1] = drawStdNormalPoints(numSamples)
+
+    covarMatn = [  [sigmaN**2,            rn*sigmaN*sigmaLNn],
+                   [rn*sigmaN*sigmaLNn,   sigmaLNn**2]
+                ]
+
+    LCholesky = cholesky(covarMatn)
+
+#    normalPoints = dot(stdNormalPoints, LCholesky) + [muN, muLNn]
+    normalPoints = dot(stdNormalPoints, LCholesky.T) + [muN, muLNn]
+
+#    pdb.set_trace()
+
+    normalLognormalPoints = normalPoints
+    normalLognormalPoints[:,1] = exp(normalLognormalPoints[:,1])
+
+    return normalLognormalPoints
+
         
-def computeRmseN(numSamples):
+def computeFracRmseN(numSamples):
     from numpy import zeros, arange
     from mc_utilities import computeRmse, calcFncValues, integrateFncValues
 
 #    print("In computeRmseN")
-    fncDim = 1  # Dimension of uni- or multi-variate integrand function
-    mu = 0
-    sigma = 1
-    fncExpnt = 4
-    numExperiments = 1000
+    fncDim = 2  # Dimension of uni- or multi-variate integrand function
+    muChi = 10
+    sigmaChi = 1
+    muNcn = 10
+    sigmaNcn = 5
+    rChiNcn = -0.5
+    alpha = 1 #2.47
+    beta = -1 #-1.79
+
+    numExperiments = 1
 
     mcIntegral = zeros(numExperiments)
 
-    analyticIntegral =  calcAnalyticIntegral(sigma,fncExpnt)   
+    analyticIntegral =  calcAutoconversionIntegral( muChi,sigmaChi,
+                                                    muNcn,sigmaNcn,
+                                                    rChiNcn,
+                                                    alpha,beta
+                                                  )
+#    pdb.set_trace()
+
     print "Analytic calculation of integral = %s" % analyticIntegral
 
     for idx in arange(numExperiments):
 
-        normalPoints = drawNormalPoints(numSamples,mu,sigma)
+        samplePoints = drawNormalLognormalPoints( numSamples,
+                                                  muChi,sigmaChi,
+                                                  muNcn,sigmaNcn,
+                                                  rChiNcn)
 #    print"NormalPoints = %s" % normalPoints
-    
+
+#        pdb.set_trace()    
 #        fncValuesArray = calcFncValues(numSamples,normalPoints,fncExpnt)    
-        fncValuesArray = calcFncValues(numSamples,fncDim,normalPoints,fnc2integrate,fncExpnt)
+        fncValuesArray = calcFncValues(numSamples,fncDim,samplePoints,
+                                       autoconversionRate,alpha,beta)
 #    print"Function values = %s" % fncValuesArray  
 
 #        pdb.set_trace()
     
         mcIntegral[idx] = integrateFncValues(fncValuesArray,numSamples)
-#        print "Monte Carlo estimate = %s" % mcIntegral[idx]    
+        print "Monte Carlo estimate = %s" % mcIntegral[idx]    
         
     
-    rmse = computeRmse(analyticIntegral,mcIntegral)
-    print "RMSE of Monte Carlo estimate = %s" % rmse
+    fracRmse = computeRmse(analyticIntegral,mcIntegral)/analyticIntegral
+    print "Fractional RMSE of Monte Carlo estimate = %s" % fracRmse
     
-    return rmse    
+    return fracRmse    
     
 def main():
     from numpy import zeros, arange, sqrt
     import matplotlib.pyplot as plt
     
-    numNValues = 10
+    numNValues = 20#10 # Number of trials with different sample size
 
-    rmseNValues = zeros(numNValues)    
+    fracRmseNValues = zeros(numNValues)    
     numSamplesN = zeros(numNValues)
-
     
     for idx in arange(numNValues):    
         numSamplesN[idx] = 2**(idx+2)
         print "numSamplesN = %s" % numSamplesN[idx]
-        rmseNValues[idx] = computeRmseN(numSamplesN[idx])
+        fracRmseNValues[idx] = computeFracRmseN(numSamplesN[idx])
     
-    theoryError = 100.0/sqrt(numSamplesN)    
+    theoryError = 10.0/sqrt(numSamplesN)    
     
     plt.clf()
 #    plt.subplot(221)
-    plt.loglog(numSamplesN, rmseNValues, label='MC Error')    
+    plt.loglog(numSamplesN, fracRmseNValues, label='Fractional MC Error')    
     plt.loglog(numSamplesN, theoryError, label='Theory (1/sqrt(N))')
     plt.legend()
     plt.xlabel('Number of sample points')

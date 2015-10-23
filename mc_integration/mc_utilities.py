@@ -30,7 +30,8 @@ def calcFncValues(numSamples,fncDim,samplePoints,fncIntegrand,*args):
         if (samplePoints.shape[1] != fncDim):
             print "Error: normalPoints does not have fncDim columns in function calcFncValues."    
 
-    fncValuesArray = zeros((numSamples,fncDim))
+#    fncValuesArray = zeros((numSamples,fncDim))
+    fncValuesArray = zeros(numSamples)
     
     idx = 0
     while idx < numSamples:
