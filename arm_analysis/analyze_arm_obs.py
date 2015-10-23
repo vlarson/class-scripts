@@ -12,9 +12,9 @@ from scipy.io import netcdf
 # Point to directory containing ARM observations 
 data_dir = '/home/studi/Larson/arm_obs/arm_data_files'
 
-data_file = '/home/studi/Larson/arm_obs/arm_data_files/sgpbeflux1longC1.c1.20131215.000000.custom.cdf'
-#data_file = '/home/studi/Larson/arm_obs/arm_data_files/sgpbeflux1longC1.c1.20131217.000000.custom.cdf'
-#data_file = '/home/studi/Larson/arm_obs/arm_data_files/sgpbeflux1longC1.c1.20131218.000000.custom.cdf'
+data_file = '/home/studi/Larson/arm_data_files/sgpbeflux1longC1.c1.20131215.000000.custom.cdf'
+#data_file = '/home/studi/Larson/arm_data_files/sgpbeflux1longC1.c1.20131217.000000.custom.cdf'
+#data_file = '/home/studi/Larson/arm_data_files/sgpbeflux1longC1.c1.20131218.000000.custom.cdf'
 
 #data_file = 'simple_xy.nc'
 

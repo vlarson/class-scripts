@@ -5,15 +5,11 @@ import pdb
 
 # pdb.set_trace()
 
-def drawStdNormalPoints(numSamples):
-    from numpy import random
-    from scipy.stats import norm
-    uniformPoints = random.rand(numSamples)
-    StdNormalPoints = norm.ppf(uniformPoints)
-    return StdNormalPoints
-
 def drawNormalPoints(numSamples,mu,sigma):
+    from mc_utilities import drawStdNormalPoints
+
     StdNormalPoints = drawStdNormalPoints(numSamples)
+
     return mu + sigma*StdNormalPoints
 
 def fnc2integrate(x,fncExpnt):
@@ -22,23 +18,6 @@ def fnc2integrate(x,fncExpnt):
     else:
         fncValue = x**fncExpnt 
     return fncValue
-
-def calcFncValues(numSamples,normalPoints,fncExpnt):
-    from numpy import zeros
-    
-    fncValuesArray = zeros((numSamples,1))
-    
-    idx = 0
-    while idx < numSamples:
-        fncValuesArray[idx] = fnc2integrate(normalPoints[idx],fncExpnt)
-        idx = idx + 1        
-        
-    return fncValuesArray.T
-
-def integrateFncValues(fncValueArray,numSamples):
-    from numpy import sum 
-    mcIntegral = sum(fncValueArray)/numSamples
-    return mcIntegral
 
 def calcAnalyticIntegral(sigma,fncExpnt):
     from scipy.special import gamma as gamma_fnc
@@ -49,19 +28,13 @@ def calcAnalyticIntegral(sigma,fncExpnt):
                         *(2*sigma**2)**(0.5*(fncExpnt+1))
 #    pdb.set_trace()
     return analyticIntegral
-    
-def computeRmse(analyticIntegral,mcIntegral):
-    from numpy import sqrt, mean
-    
-#    print("In computeRmse")
-
-    return sqrt(mean((mcIntegral - analyticIntegral) ** 2))    
-    
+        
 def computeRmseN(numSamples):
     from numpy import zeros, arange
+    from mc_utilities import computeRmse, calcFncValues, integrateFncValues
 
 #    print("In computeRmseN")
-   
+    fncDim = 1  # Dimension of uni- or multi-variate integrand function
     mu = 0
     sigma = 1
     fncExpnt = 4
@@ -77,7 +50,8 @@ def computeRmseN(numSamples):
         normalPoints = drawNormalPoints(numSamples,mu,sigma)
 #    print"NormalPoints = %s" % normalPoints
     
-        fncValuesArray = calcFncValues(numSamples,normalPoints,fncExpnt)    
+#        fncValuesArray = calcFncValues(numSamples,normalPoints,fncExpnt)    
+        fncValuesArray = calcFncValues(numSamples,fncDim,normalPoints,fnc2integrate,fncExpnt)
 #    print"Function values = %s" % fncValuesArray  
 
 #        pdb.set_trace()
