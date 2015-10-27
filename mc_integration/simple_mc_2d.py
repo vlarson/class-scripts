@@ -70,12 +70,12 @@ def computeFracRmseN(numSamples):
 
 #    print("In computeRmseN")
     fncDim = 2  # Dimension of uni- or multi-variate integrand function
-    muChi = 10
+    muChi = 0
     sigmaChi = 1
-    muNcn = 10
-    sigmaNcn = 5
-    rChiNcn = -0.5
-    alpha = 1 #2.47
+    muNcn = 0
+    sigmaNcn = 1.5
+    rChiNcn = -0.0
+    alpha = 0 #2.47
     beta = -1 #-1.79
 
     numExperiments = 1
