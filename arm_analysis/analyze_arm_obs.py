@@ -4,7 +4,7 @@
 """
 
 # Import libraries
-from numpy import fmax, arange, meshgrid
+from numpy import fmax, arange, meshgrid, array, ix_
 import matplotlib.pyplot as plt
 from scipy.io import netcdf
 import pdb
@@ -73,9 +73,69 @@ plt.show()
 #
 ##################################
 
+#date = 20131205
+#date = 20131206
+#date = 20131207
+date = 20131215
+
+if date == 20131205:
+    # Radar could see clouds up to 8 km on 20131205:
+    radar_refl_file = data_dir + 'sgpkazrcorgeC1.c1.20131205.000002.custom.nc'
+    # Grid level at which to plot time series and histogram    
+    range_level = 167  
+    # Time and time step at which profile of reflectivity is plotted
+    time_of_cloud = 69000 
+    # Impose a threshold on reflectivity_copol to get rid of nighttime values
+    min_refl = -30
+    # Indices for range of altitudes for time-height plots
+    height_range = arange(50,250)
+    # Indices for range of times for time-height plots
+    time_range_half_width = 2000
+elif date == 20131206:
+    # Radar could see clouds up to 2 km on 20131206:
+    radar_refl_file = data_dir + 'sgpkazrcorgeC1.c1.20131206.000000.custom.nc'    
+    # Grid level at which to plot time series and histogram
+    range_level = 45
+    # Time and time step at which profile of reflectivity is plotted
+    time_of_cloud = 75000 
+    # Impose a threshold on reflectivity_copol to get rid of nighttime values
+    min_refl = -30
+    # Indices for range of altitudes for time-height plots
+    height_range = arange(0,100)
+    # Indices for range of times for time-height plots
+    time_range_half_width = 1000
+elif date == 20131207:
+    # Radar could see clouds up to 4 km on 20131207:
+    radar_refl_file = data_dir + 'sgpkazrcorgeC1.c1.20131207.000001.custom.nc'    
+    # Grid level at which to plot time series and histogram
+    range_level = 117
+    # Time and time step at which profile of reflectivity is plotted
+    time_of_cloud = 69000 
+    # Impose a threshold on reflectivity_copol to get rid of nighttime values
+    min_refl = -30
+    # Indices for range of altitudes for time-height plots
+    height_range = arange(0,200)
+    # Indices for range of times for time-height plots
+    time_range_half_width = 2000
+elif date == 20131215:
+    # Radar could see clouds up to 4 km on 20131207:
+    radar_refl_file = data_dir + 'sgpkazrcorgeC1.c1.20131215.000003.custom.nc'    
+    # Grid level at which to plot time series and histogram
+    range_level = 117
+    # Time and time step at which profile of reflectivity is plotted
+    time_of_cloud = 69000 
+    # Impose a threshold on reflectivity_copol to get rid of nighttime values
+    min_refl = -30
+    # Indices for range of altitudes for time-height plots
+    height_range = arange(0,200)
+    # Indices for range of times for time-height plots
+    time_range_half_width = 2000
+else:
+    print "Wrong date"
+
 #radar_refl_file = data_dir + 'sgpkazrcorgeC1.c1.20131204.000000.custom.nc'
 # Radar could see clouds up to 8 km on 20131205:
-radar_refl_file = data_dir + 'sgpkazrcorgeC1.c1.20131205.000002.custom.nc'
+#radar_refl_file = data_dir + 'sgpkazrcorgeC1.c1.20131205.000002.custom.nc'
 # Radar could see clouds up to 2 km on 20131206:
 #radar_refl_file = data_dir + 'sgpkazrcorgeC1.c1.20131206.000000.custom.nc'
 # Radar could see clouds up to 4 km on 20131207:
@@ -91,19 +151,22 @@ radar_refl_nc = netcdf.netcdf_file(radar_refl_file, 'r')
 
 time_offset_radar_refl = radar_refl_nc.variables['time_offset']
 
-reflectivity_copol = radar_refl_nc.variables['reflectivity_copol']
+# The final [:,:] converts to a numpy array, I think
+#reflectivity_copol = radar_refl_nc.variables['reflectivity_copol'][:,:]
+reflectivity_copol = radar_refl_nc.variables['reflectivity_copol'].data
+
 
 # Impose a threshold on reflectivity_copol to get rid of nighttime values
-min_refl = -30
+#min_refl = -30
 
 # Grid level at which to plot time series and histogram
-range_level = 167  #  Level of clouds in 20131205
+#range_level = 167  #  Level of clouds in 20131205
 #range_level = 45    #  Level of clouds in 20131206
 #range_level = 117  #  Level of clouds in 20131207
 #range_level = 45    
 
 # Time and time step at which profile of reflectivity is plotted
-time_of_cloud = 69000 # Time of clouds in 20131205
+#time_of_cloud = 69000 # Time of clouds in 20131205
 #time_of_cloud = 75000 # Time of clouds in 20131206
 #time_of_cloud = 69000 # Time of clouds in 20131207
 #time_of_cloud = 69000
@@ -154,11 +217,26 @@ plt.show
 
 #pdb.set_trace()
 
+#height_range = arange(50,250)
+#time_range_half_width = 2000
+time_range = arange((timestep_of_cloud-time_range_half_width),
+                    (timestep_of_cloud+time_range_half_width))
 
 #exit
-#TIME, HEIGHT = meshgrid(height[:], time_offset_radar_refl[16000:17000])
-#plt.contour(HEIGHT[:],TIME[:],reflectivity_copol[16000:17000,:])
-##plt.figure()
+TIME, HEIGHT = meshgrid(height[height_range], 
+                        time_offset_radar_refl[time_range])
+# The numpy ix_ function is needed to extract the right part of the matrix 
+# either contourf or pcolormesh produces filled contours
+radarContour = plt.pcolormesh(HEIGHT[:],TIME[:],reflectivity_copol[ix_(time_range,height_range)])
+# Make a colorbar for the ContourSet returned by the contourf call.
+cbar = plt.colorbar(radarContour)
+cbar.ax.set_ylabel('Reflectivity  [dBZ]')
+# Add the contour line levels to the colorbar
+#cbar.add_lines(radarContour)
+plt.title('Radar reflectivity')
+plt.xlabel('Time')
+plt.ylabel('Altitude  [m]')
+plt.figure()
 ##plt.show()
 #
 #plt.clf()
@@ -170,3 +248,5 @@ plt.show
 ##plt.show()
 #
 ##pdb.set_trace()
+                        
+radar_refl_nc.close()
