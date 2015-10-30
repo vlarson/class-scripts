@@ -7,10 +7,16 @@ import pdb
 # pdb.set_trace()
 
 def drawStdNormalPoints(numSamples):
-    from numpy import random
+    from numpy.random import rand, permutation
     from scipy.stats import norm
 
-    uniformPoints = random.rand(numSamples)
+#   Straight Monte Carlo
+#   uniformPoints = rand(numSamples)
+#    pdb.set_trace()
+
+    PiLh = permutation(int(numSamples))
+        
+    uniformPoints = (PiLh + rand(numSamples))/numSamples
     StdNormalPoints = norm.ppf(uniformPoints)
 
     return StdNormalPoints

@@ -74,22 +74,35 @@ def computeFracRmseN(numSamples):
     sigmaChi = 1
     muNcn = 0
     sigmaNcn = 1.5
-    rChiNcn = -0.0
-    alpha = 0 #2.47
-    beta = -1 #-1.79
+    rChiNcn = 0.5
+    alpha = 2.47 #2.47
+    beta = -1.79 #-1.79
+    # Control variate parameters
+    alphaDelta = -0.3  # Increment to alpha for control variates function, h
+    betaDelta = -0.3  # Increment to beta for control variates function, h
+    betaRegEst = 0.3
 
-    numExperiments = 1
+    numExperiments = 1000
 
     mcIntegral = zeros(numExperiments)
+    mcIntegralCV = zeros(numExperiments)
 
     analyticIntegral =  calcAutoconversionIntegral( muChi,sigmaChi,
                                                     muNcn,sigmaNcn,
                                                     rChiNcn,
                                                     alpha,beta
                                                   )
+    print "Analytic calculation of true integral = %s" % analyticIntegral
+
+    analyticIntegralCV =  calcAutoconversionIntegral( muChi,sigmaChi,
+                                                    muNcn,sigmaNcn,
+                                                    rChiNcn,
+                                                    alpha+alphaDelta,beta+betaDelta
+                                                  )
+    print "Analytic calculation of CV integral = %s" % analyticIntegralCV
+
 #    pdb.set_trace()
 
-    print "Analytic calculation of integral = %s" % analyticIntegral
 
     for idx in arange(numExperiments):
 
@@ -104,37 +117,47 @@ def computeFracRmseN(numSamples):
         fncValuesArray = calcFncValues(numSamples,fncDim,samplePoints,
                                        autoconversionRate,alpha,beta)
 #    print"Function values = %s" % fncValuesArray  
+        fncValuesArrayCV = calcFncValues(numSamples,fncDim,samplePoints,
+                                       autoconversionRate,alpha+alphaDelta,beta+betaDelta)                                       
 
 #        pdb.set_trace()
     
         mcIntegral[idx] = integrateFncValues(fncValuesArray,numSamples)
-        print "Monte Carlo estimate = %s" % mcIntegral[idx]    
+        print "Monte Carlo estimate = %s" % mcIntegral[idx]
         
+        mcIntegralCV[idx] = integrateFncValues(fncValuesArray-betaRegEst*fncValuesArrayCV,numSamples) \
+                            + betaRegEst*analyticIntegralCV
+        print "CV Monte Carlo estimate = %s" % mcIntegralCV[idx] 
     
     fracRmse = computeRmse(analyticIntegral,mcIntegral)/analyticIntegral
     print "Fractional RMSE of Monte Carlo estimate = %s" % fracRmse
     
-    return fracRmse    
+    fracRmseCV = computeRmse(analyticIntegral,mcIntegralCV)/analyticIntegral
+    print "Fractional RMSE of CV Monte Carlo estimate = %s" % fracRmseCV    
+    
+    return (fracRmse, fracRmseCV)    
     
 def main():
     from numpy import zeros, arange, sqrt
     import matplotlib.pyplot as plt
     
-    numNValues = 20#10 # Number of trials with different sample size
+    numNValues = 10#20#10 # Number of trials with different sample size
 
     fracRmseNValues = zeros(numNValues)    
+    fracRmseNValuesCV = zeros(numNValues)
     numSamplesN = zeros(numNValues)
     
     for idx in arange(numNValues):    
-        numSamplesN[idx] = 2**(idx+2)
+        numSamplesN[idx] =  2**(idx+2)
         print "numSamplesN = %s" % numSamplesN[idx]
-        fracRmseNValues[idx] = computeFracRmseN(numSamplesN[idx])
+        fracRmseNValues[idx], fracRmseNValuesCV[idx] = computeFracRmseN(numSamplesN[idx])
     
     theoryError = 10.0/sqrt(numSamplesN)    
     
     plt.clf()
 #    plt.subplot(221)
-    plt.loglog(numSamplesN, fracRmseNValues, label='Fractional MC Error')    
+    plt.loglog(numSamplesN, fracRmseNValues, label='Fractional MC Error') 
+    plt.loglog(numSamplesN, fracRmseNValuesCV, label='Fractional CV MC Error')
     plt.loglog(numSamplesN, theoryError, label='Theory (1/sqrt(N))')
     plt.legend()
     plt.xlabel('Number of sample points')
