@@ -18,6 +18,19 @@ def autoconversionRate(TwoDSamplePoint,alpha,beta):
     
     return fncValue
 
+def evaporationRate(TwoDSamplePoint,alpha,beta):
+    
+    chi = TwoDSamplePoint[0]
+    Nc  = TwoDSamplePoint[1]
+    if chi > 0:
+        fncValue = 0
+    else:
+        fncValue = abs(chi)**alpha * Nc**beta 
+
+#    pdb.set_trace()
+    
+    return fncValue
+
 def calcAutoconversionIntegral(muChi,sigmaChi,muNcn,sigmaNcn,rChiNcn,alpha,beta):
     from scipy.special import gamma, pbdv 
     from math import sqrt, exp, pi
@@ -39,7 +52,7 @@ def calcAutoconversionIntegral(muChi,sigmaChi,muNcn,sigmaNcn,rChiNcn,alpha,beta)
 
 def drawNormalLognormalPoints(numSamples,muN,sigmaN,muLNn,sigmaLNn,rn):
     from mc_utilities import drawStdNormalPoints
-    from numpy import zeros, exp, dot
+    from numpy import zeros, exp, dot, copy
     from numpy.linalg import cholesky
 
     stdNormalPoints = zeros((numSamples,2))
@@ -58,15 +71,16 @@ def drawNormalLognormalPoints(numSamples,muN,sigmaN,muLNn,sigmaLNn,rn):
 
 #    pdb.set_trace()
 
-    normalLognormalPoints = normalPoints
+    normalLognormalPoints = copy(normalPoints)
     normalLognormalPoints[:,1] = exp(normalLognormalPoints[:,1])
 
     return normalLognormalPoints
 
         
 def computeFracRmseN(numSamples):
-    from numpy import zeros, arange
+    from numpy import zeros, arange, copy, cov, any, nan, clip, finfo, amax
     from mc_utilities import computeRmse, calcFncValues, integrateFncValues
+    from math import isnan
 
 #    print("In computeRmseN")
     fncDim = 2  # Dimension of uni- or multi-variate integrand function
@@ -80,11 +94,11 @@ def computeFracRmseN(numSamples):
     # Control variate parameters
     alphaDelta = -0.3  # Increment to alpha for control variates function, h
     betaDelta = -0.3  # Increment to beta for control variates function, h
-    betaRegEst = 0.3
 
     numExperiments = 1000
 
     mcIntegral = zeros(numExperiments)
+    mcIntegralEvap = zeros(numExperiments)
     mcIntegralCV = zeros(numExperiments)
 
     analyticIntegral =  calcAutoconversionIntegral( muChi,sigmaChi,
@@ -92,48 +106,84 @@ def computeFracRmseN(numSamples):
                                                     rChiNcn,
                                                     alpha,beta
                                                   )
-    print "Analytic calculation of true integral = %s" % analyticIntegral
+    #print "Analytic calculation of true integral = %s" % analyticIntegral
 
     analyticIntegralCV =  calcAutoconversionIntegral( muChi,sigmaChi,
                                                     muNcn,sigmaNcn,
                                                     rChiNcn,
                                                     alpha+alphaDelta,beta+betaDelta
                                                   )
-    print "Analytic calculation of CV integral = %s" % analyticIntegralCV
+    #print "Analytic calculation of CV integral = %s" % analyticIntegralCV
 
 #    pdb.set_trace()
 
 
     for idx in arange(numExperiments):
 
+        #pdb.set_trace()
+
         samplePoints = drawNormalLognormalPoints( numSamples,
                                                   muChi,sigmaChi,
                                                   muNcn,sigmaNcn,
                                                   rChiNcn)
-#    print"NormalPoints = %s" % normalPoints
+
+#        samplePointsEvap = copy(samplePoints)
+#        # Reverse sign of s points
+#        samplePointsEvap[:,0] = -1.0*samplePointsEvap[:,0]
+        samplePointsEvap = drawNormalLognormalPoints( numSamples,
+                                                  -muChi,sigmaChi,
+                                                  muNcn,sigmaNcn,
+                                                  -rChiNcn)
 
 #        pdb.set_trace()    
 #        fncValuesArray = calcFncValues(numSamples,normalPoints,fncExpnt)    
         fncValuesArray = calcFncValues(numSamples,fncDim,samplePoints,
                                        autoconversionRate,alpha,beta)
+
+        fncValuesArrayEvap = calcFncValues(numSamples,fncDim,samplePointsEvap,
+                                       evaporationRate,alpha,beta)
 #    print"Function values = %s" % fncValuesArray  
         fncValuesArrayCV = calcFncValues(numSamples,fncDim,samplePoints,
                                        autoconversionRate,alpha+alphaDelta,beta+betaDelta)                                       
 
-#        pdb.set_trace()
+        if any(fncValuesArrayCV==nan):
+            pdb.set_trace()
+
+        #pdb.set_trace()
+        # Compute optimal beta for control variates
+        covCV = cov(fncValuesArray,fncValuesArrayCV)
+
+        betaOpt = covCV[0,1]/amax([ covCV[1,1] , finfo(float).eps ])
+        betaOpt = clip(betaOpt, 0.0, 1.0)
+        #print "betaOpt = %s" % betaOpt
+        #print "covCV = %s" % covCV
     
         mcIntegral[idx] = integrateFncValues(fncValuesArray,numSamples)
-        print "Monte Carlo estimate = %s" % mcIntegral[idx]
+        #print "Monte Carlo estimate = %s" % mcIntegral[idx]
+
+        mcIntegralEvap[idx] = integrateFncValues(fncValuesArrayEvap,numSamples)
+        #print "Evaporation Monte Carlo estimate = %s" % mcIntegralEvap[idx]
         
-        mcIntegralCV[idx] = integrateFncValues(fncValuesArray-betaRegEst*fncValuesArrayCV,numSamples) \
-                            + betaRegEst*analyticIntegralCV
-        print "CV Monte Carlo estimate = %s" % mcIntegralCV[idx] 
+        mcIntegralCV[idx] = integrateFncValues(fncValuesArray-betaOpt*fncValuesArrayCV,numSamples) \
+                            + betaOpt*analyticIntegralCV
+        #print "CV Monte Carlo estimate = %s" % mcIntegralCV[idx] 
+    
+        #pdb.set_trace()    
+        if isnan(mcIntegralCV[idx]):
+            pdb.set_trace()
+
     
     fracRmse = computeRmse(analyticIntegral,mcIntegral)/analyticIntegral
     print "Fractional RMSE of Monte Carlo estimate = %s" % fracRmse
+
+#    pdb.set_trace()
     
     fracRmseCV = computeRmse(analyticIntegral,mcIntegralCV)/analyticIntegral
     print "Fractional RMSE of CV Monte Carlo estimate = %s" % fracRmseCV    
+
+#    if isnan(fracRmseCV):
+#    pdb.set_trace
+
     
     return (fracRmse, fracRmseCV)    
     
@@ -153,6 +203,8 @@ def main():
         fracRmseNValues[idx], fracRmseNValuesCV[idx] = computeFracRmseN(numSamplesN[idx])
     
     theoryError = 10.0/sqrt(numSamplesN)    
+
+#    pdb.set_trace()
     
     plt.clf()
 #    plt.subplot(221)
