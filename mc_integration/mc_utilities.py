@@ -7,6 +7,8 @@ import pdb
 # pdb.set_trace()
 
 def drawStdNormalPoints(numSamples):
+    """Draw sample points from a univariate standard normal PDF."""     
+    
     from numpy.random import rand, permutation
     from scipy.stats import norm
 
@@ -23,6 +25,8 @@ def drawStdNormalPoints(numSamples):
     return StdNormalPoints
 
 def calcFncValues(numSamples,fncDim,samplePoints,fncIntegrand,*args):
+    """Compute the values of an integrand at a given set of sample points."""
+
     from numpy import zeros
 
 #    pdb.set_trace()     
@@ -49,6 +53,8 @@ def calcFncValues(numSamples,fncDim,samplePoints,fncIntegrand,*args):
     return fncValuesArray.T
     
 def integrateFncValues(fncValueArray,numSamples):
+    """Sum function values in order to estimate integral."""
+
     from numpy import sum 
 
     mcIntegral = sum(fncValueArray)/numSamples
@@ -56,6 +62,8 @@ def integrateFncValues(fncValueArray,numSamples):
     return mcIntegral
     
 def computeRmse(analyticIntegral,mcIntegral):
+    """Compute the root-mean-square error in a Monte Carlo integration."""    
+        
     from numpy import sqrt, mean
 
     return sqrt(mean((mcIntegral - analyticIntegral) ** 2))    

@@ -5,13 +5,7 @@
 
 
 def plotSfcRad(beflux_file, min_sdn):
-
-
-##################################
-#
-#  Plot surface radiative fields
-#
-##################################
+    """Plot surface radiative fields."""
 
 # Point to directory containing ARM observations 
 #data_dir = '/home/studi/Larson/arm_data_files/'
@@ -68,11 +62,19 @@ def plotSfcRad(beflux_file, min_sdn):
     return
         
 def findTruncNormalRoots(truncMean,truncVarnce,muInit,sigmaInit,min_refl):
+    """Returns parameters mu and sigma of a truncated normal distribution.
     
-    from scipy.optimize import root
-    from numpy import sqrt    
+    Inputs:    
+    truncMean = mean of truncated part of full (untruncated) normal
+    truncVarnce = variance of truncated part of full normal
+    muInit = first guess value of mu, the mean of the full normal    
+    sigmaInit = first guess value of sigma, the standard deviation of the full normal
+    min_refl = minimum (left) threshold value at which normal is truncated
+    """
+    
+    from scipy.optimize import root  
 
-    sol = root(findTruncMeanVarnceFncVal, [muInit, sigmaInit], 
+    sol = root(findTruncMeanVarnceFncResid, [muInit, sigmaInit], 
                args=(truncMean,truncVarnce,min_refl), jac=False, method='hybr')
 
     mu = sol.x[0]
@@ -80,13 +82,25 @@ def findTruncNormalRoots(truncMean,truncVarnce,muInit,sigmaInit,min_refl):
     
     return (mu, sigma)
     
-def findTruncMeanVarnceFncVal(x,truncMean,truncVarnce,min_refl):
+def findTruncMeanVarnceFncResid(x,truncMean,truncVarnce,min_refl):
+    """Evaluates the residual of the function that we want to zero 
+    in order to solve for the parameters of a truncated normal distribution.
+    
+    Inputs:
+    x[0] = mean of untruncated (full) normal
+    x[1] = standard deviation of untruncated normal
+    truncMean = mean of truncated part of full normal
+    truncVarnce = variance of truncated part of full normal
+    min_refl = minimum (left) threshold value at which normal is truncated
+    
+    Output:
+    Residual of the function to be zeroed
+    """
+
 
     mu = x[0]
     sigma = x[1]    
     
-#    truncMean = args[0]
-#    truncVarnce = args[1]
     alpha = (min_refl-mu)/sigma 
     lambdaAlpha = lambdaFnc(alpha)
     
@@ -97,6 +111,7 @@ def findTruncMeanVarnceFncVal(x,truncMean,truncVarnce,min_refl):
     return (truncMeanResid, truncVarnceResid)
     
 def lambdaFnc(alpha):
+    """A utility function used to relate moments and parameters of a truncated normal."""
     
     from scipy.stats import norm
     from numpy import finfo, amax        
@@ -105,7 +120,6 @@ def lambdaFnc(alpha):
     return norm.pdf(alpha) / amax([ 1.0 - norm.cdf(alpha) , finfo(float).eps ])
 
 def deltaFnc(alpha,lambdaAlpha):
-
-#    lambda_alpha = lambdaFnc(alpha)
+    """A utility function used to relate variance and sigma parameter of a truncated normal."""
     
     return lambdaAlpha * ( lambdaAlpha - alpha )

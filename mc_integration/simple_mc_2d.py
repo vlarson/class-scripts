@@ -6,6 +6,7 @@ import pdb
 # pdb.set_trace()
 
 def autoconversionRate(TwoDSamplePoint,alpha,beta):
+    """Return a quantity proportional to the Khairoutdinov-Kogan autoconversion rate."""
     
     chi = TwoDSamplePoint[0]
     Nc  = TwoDSamplePoint[1]
@@ -19,6 +20,7 @@ def autoconversionRate(TwoDSamplePoint,alpha,beta):
     return fncValue
 
 def evaporationRate(TwoDSamplePoint,alpha,beta):
+    """A simple function that mimics an evaporation formula."""
     
     chi = TwoDSamplePoint[0]
     Nc  = TwoDSamplePoint[1]
@@ -32,6 +34,9 @@ def evaporationRate(TwoDSamplePoint,alpha,beta):
     return fncValue
 
 def calcAutoconversionIntegral(muChi,sigmaChi,muNcn,sigmaNcn,rChiNcn,alpha,beta):
+    """Calculate the Khairoutdinov-Kogan autoconversion rate, 
+    upscaled over a single normal-lognormal PDF.""" 
+
     from scipy.special import gamma, pbdv 
     from math import sqrt, exp, pi
 
@@ -51,6 +56,8 @@ def calcAutoconversionIntegral(muChi,sigmaChi,muNcn,sigmaNcn,rChiNcn,alpha,beta)
     return analyticIntegral
 
 def drawNormalLognormalPoints(numSamples,muN,sigmaN,muLNn,sigmaLNn,rn):
+    """Return sample points from a non-standard normal-lognormal PDF."""
+
     from mc_utilities import drawStdNormalPoints
     from numpy import zeros, exp, dot, copy
     from numpy.linalg import cholesky
@@ -78,9 +85,14 @@ def drawNormalLognormalPoints(numSamples,muN,sigmaN,muLNn,sigmaLNn,rn):
 
         
 def computeFracRmseN(numSamples):
+    """Return the fractional root-mean-square error 
+    in a Monte-Carlo integration of Khairoutdinov-Kogan autoconversion."""    
+    
+    
     from numpy import zeros, arange, copy, cov, any, nan, clip, finfo, amax
     from mc_utilities import computeRmse, calcFncValues, integrateFncValues
     from math import isnan
+    import matplotlib.pyplot as plt 
 
 #    print("In computeRmseN")
     fncDim = 2  # Dimension of uni- or multi-variate integrand function
@@ -95,7 +107,7 @@ def computeFracRmseN(numSamples):
     alphaDelta = -0.3  # Increment to alpha for control variates function, h
     betaDelta = -0.3  # Increment to beta for control variates function, h
 
-    numExperiments = 1000
+    numExperiments = 100#1000
 
     mcIntegral = zeros(numExperiments)
     mcIntegralEvap = zeros(numExperiments)
@@ -126,7 +138,7 @@ def computeFracRmseN(numSamples):
                                                   muChi,sigmaChi,
                                                   muNcn,sigmaNcn,
                                                   rChiNcn)
-
+        
 #        samplePointsEvap = copy(samplePoints)
 #        # Reverse sign of s points
 #        samplePointsEvap[:,0] = -1.0*samplePointsEvap[:,0]
@@ -148,6 +160,8 @@ def computeFracRmseN(numSamples):
 
         if any(fncValuesArrayCV==nan):
             pdb.set_trace()
+
+
 
         #pdb.set_trace()
         # Compute optimal beta for control variates
@@ -184,6 +198,15 @@ def computeFracRmseN(numSamples):
 #    if isnan(fracRmseCV):
 #    pdb.set_trace
 
+    plt.scatter(fncValuesArray,fncValuesArrayCV)
+    plt.plot([min(fncValuesArray), max(fncValuesArray)], 
+             [min(fncValuesArray), max(fncValuesArray)])
+    plt.grid()
+    plt.xlabel('Original function values')
+    plt.ylabel('Control variate function values')
+    plt.show()
+
+#    pdb.set_trace()
     
     return (fracRmse, fracRmseCV)    
     

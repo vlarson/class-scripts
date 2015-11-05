@@ -51,7 +51,7 @@ range_level = 117
 # Time and time step at which profile of reflectivity is plotted
 time_of_cloud = 69000 
 # Impose a threshold on reflectivity_copol to get rid of nighttime values
-min_refl = -30
+minThreshRefl = -30
 # Indices for range of altitudes for time-height plots
 height_range = arange(0,200)
 # Indices for range of times for time-height plots
@@ -59,11 +59,11 @@ time_range_half_width = 2000
 
 # Now overwrite defaults with specialized values for particular days
 
-date = 20131204    # Shallow Sc
+#date = 20131204    # Shallow Sc
 #date = 20131205    # Deep Cu
 #date = 20131206    # Shallow Sc, bad data?
 #date = 20131207    # Sc/Cu from 3 to 4 km
-#date = 20131208    # Low drizzling Cu
+date = 20131208    # Low drizzling Cu
 #date = 20131215    # No clouds
 #date = 20131217    # Noise
 
@@ -105,7 +105,7 @@ elif date == 20131208:
     # Grid level at which to plot time series and histogram
     range_level = 9
     # Impose a threshold on reflectivity_copol to get rid of nighttime values
-    min_refl = -40
+    minThreshRefl = -40
 elif date == 20131215:
     # Radar couldn't see clouds on 20131215:
     radar_refl_file = data_dir + 'sgpkazrcorgeC1.c1.20131215.000003.custom.nc'    
@@ -125,9 +125,9 @@ timestep_of_cloud = (abs(time_offset_radar_refl[:]-time_of_cloud)).argmin()
 time_range = arange((timestep_of_cloud-time_range_half_width),
                     (timestep_of_cloud+time_range_half_width))
                     
-# The final [:,:] converts to a numpy array, I think
+# The final [:,:] converts to a numpy array, I think.
 #reflectivity_copol = radar_refl_nc.variables['reflectivity_copol'][:,:]
-# Or just use .data
+# Or just use .data, as follows:
 reflectivity_copol = radar_refl_nc.variables['reflectivity_copol'].data
 
 # The numpy ix_ function is needed to extract the right part of the matrix
@@ -136,11 +136,11 @@ reflectivity_copol = reflectivity_copol[ix_(time_range,height_range)]
 #pdb.set_trace()
 
 # Replace small values with threshold, for plotting time series
-refl_floored = fmax(min_refl,reflectivity_copol[:])
+refl_floored = fmax(minThreshRefl,reflectivity_copol[:])
 
 # Remove small values from time series, thereby shortening vector length,
 # and convert to numpy array
-reflTrunc = asarray([x for x in reflectivity_copol[:,range_level] if x > min_refl])
+reflTrunc = asarray([x for x in reflectivity_copol[:,range_level] if x > minThreshRefl])
 
 range_gate_spacing = 29.979246
 height = arange(0, 676*range_gate_spacing-1, range_gate_spacing)
@@ -165,7 +165,6 @@ TIME, HEIGHT = meshgrid(height[height_range],
 # either contourf or pcolormesh produces filled contours
 plt.clf()
 radarContour = plt.pcolormesh(HEIGHT[:],TIME[:],reflectivity_copol)
-#radarContour = plt.pcolormesh(HEIGHT[:],TIME[:],reflectivity_copol[ix_(time_range,height_range)])
 # Make a colorbar for the ContourSet returned by the contourf call.
 cbar = plt.colorbar(radarContour)
 cbar.ax.set_ylabel('Reflectivity  [dBZ]')
@@ -176,7 +175,6 @@ plt.xlabel('Time')
 plt.ylabel('Altitude  [m]')
 plt.figure()
 ##plt.show()
-
                         
 radar_refl_nc.close()
 
@@ -187,6 +185,7 @@ truncVarnce = var(reflTrunc)
 ## Unit test: should return mu=0, sigma=1
 #truncMean = 2.0 / sqrt(2*pi)
 #truncVarnce = 1.0 - 4.0/(2.0*pi)
+#minThreshRefl = 0
 
 muInit = truncMean 
 sigmaInit = sqrt(truncVarnce)
@@ -194,7 +193,7 @@ sigmaInit = sqrt(truncVarnce)
 print "truncMean = %s"  %truncMean
 print "sqrt(truncVarnce) = %s"  %sqrt(truncVarnce)
 
-mu, sigma = findTruncNormalRoots(truncMean,truncVarnce,muInit,sigmaInit,min_refl)
+mu, sigma = findTruncNormalRoots(truncMean,truncVarnce,muInit,sigmaInit,minThreshRefl)
 
 print "mu = %s" %mu
 print "sigma = %s" %sigma
@@ -203,14 +202,12 @@ print "sigma = %s" %sigma
 plt.clf()
 plt.subplot(211)
 plt.plot(time_range,refl_floored[:,range_level])
-#plt.plot(time_offset_radar_refl[:],refl_floored[:,range_level])
 plt.xlabel('Time')
 plt.ylabel('Copolar radar reflectivity')
 
 #pdb.set_trace()
 
 # Plot histogram of copolar radar reflectivity
-#plt.clf()
 plt.subplot(212)
 n, bins, patches = plt.hist(reflTrunc[:], 50, normed=True, histtype='stepfilled')
 plt.setp(patches, 'facecolor', 'g', 'alpha', 0.75)
@@ -220,7 +217,5 @@ minRefl = min(reflTrunc[:])
 maxRefl = max(reflTrunc[:])
 reflRange = linspace(minRefl,maxRefl)
 normCurve = plt.plot(reflRange, norm.pdf(reflRange,mu,sigma)/(1.0-norm.cdf((minRefl-mu)/sigma)))
-#normCurve = plt.plot(reflRange, 
-#                     norm.pdf(reflRange,truncMean,sqrt(truncVarnce)))
 plt.figure()
 plt.show()
