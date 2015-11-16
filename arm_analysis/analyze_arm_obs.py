@@ -51,8 +51,6 @@ min_sdn = 10
 range_level = 117
 # Time and time step at which profile of reflectivity is plotted
 time_of_cloud = 69000 
-# Impose a threshold on reflectivity_copol to get rid of nighttime values
-minThreshRefl = -30
 # Indices for range of altitudes for time-height plots
 height_range = arange(0,200)
 # Indices for range of times for time-height plots
@@ -60,6 +58,12 @@ beginTimeOfPlot = 1
 endTimeOfPlot = 86399
 # If lArscl = True, then we want to use the ARSCL radar retrieval
 radarType = "arscl"
+# Impose a threshold on reflectivity_copol to get rid of noise values
+if (radarType == "arscl"):
+    minThreshRefl = -56
+else:
+    minThreshRefl = -30
+    
     
 # Now overwrite defaults with specialized values for particular days
 
@@ -70,9 +74,9 @@ radarType = "arscl"
 #date = 20131208    # Low drizzling Cu
 #date = 20131215    # No clouds
 #date = 20131217    # Noise
-#date = 20150607     # Shallow Cu and some mid level clouds
+date = 20150607     # Shallow Cu and some mid level clouds
 #date = 20150609     # Shallow Cu
-date = 20150627     # Shallow Cu
+#date = 20150627     # Shallow Cu
 
 if date == 20131204:
     # Radar showed low stratus on 20131204:
@@ -118,7 +122,7 @@ elif date == 20131217:
     # 20131217 had essentially clear skies
     radar_refl_file = data_dir + 'sgpkazrcorgeC1.c1.20131217.000003.custom.nc'    
 elif date == 20150607:
-    radarType = "kazrCormd"
+    radarType = "arscl"
     # There should have been lots of clouds, but ARSCL could see few
     if ( radarType == "arscl" ): 
         radar_refl_file = data_dir + 'sgparsclkazr1kolliasC1.c1.20150607.000000.nc'
@@ -127,13 +131,13 @@ elif date == 20150607:
     elif ( radarType == "kazrCormd" ):
         radar_refl_file = data_dir + 'sgpkazrcormdC1.c1.20150607.000000.nc'
     # Grid level at which to plot time series and histogram    
-    range_level = 167 
+    range_level = 90 
     # Indices for range of altitudes for time-height plots
     height_range = arange(0,250)
     # Time and time step at which profile of reflectivity is plotted
-    time_of_cloud = 43200 
+    time_of_cloud = 43200
 elif date == 20150609:
-    radarType = "kazrCormd"
+    radarType = "arscl"
     # Radar could see strong clouds up to 8 km on 20131205:
     if ( radarType == "arscl" ):
         radar_refl_file = data_dir + 'sgparsclkazr1kolliasC1.c1.20150609.000000.nc'
@@ -146,7 +150,7 @@ elif date == 20150609:
     # Indices for range of altitudes for time-height plots
     height_range = arange(0,150)
     # Time and time step at which profile of reflectivity is plotted
-    time_of_cloud = 43200 
+    time_of_cloud = 43200
 elif date == 20150627:
     radarType = "arscl"
     # Radar could see strong clouds up to 8 km on 20131205:
@@ -163,7 +167,6 @@ elif date == 20150627:
     height_range = arange(0,200)
     # Time and time step at which profile of reflectivity is plotted
     time_of_cloud = 43200
-    minThreshRefl = -56
 else:
     print "Wrong date"
 
@@ -241,7 +244,7 @@ plt.title('Radar reflectivity')
 plt.xlabel('Time  [' + time_offset_radar_refl.units + ']')
 plt.ylabel('Altitude  [m]')
 plt.figure()
-##plt.show()
+#plt.show()
                         
 radar_refl_nc.close()
 
@@ -259,6 +262,7 @@ mu, sigma = findTruncNormalRoots(truncMean,truncVarnce,muInit,sigmaInit,minThres
 
 print "mu = %s" %mu
 print "sigma = %s" %sigma
+
 
 # Plot time series of radar reflectivity
 plt.clf()
