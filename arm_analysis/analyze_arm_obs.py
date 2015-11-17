@@ -4,10 +4,11 @@
 """
 
 # Import libraries
-from numpy import fmax, arange, meshgrid, ix_, sqrt, mean, var, linspace, asarray
+from numpy import fmax, arange, meshgrid, ix_, sqrt, mean, var 
+from numpy import linspace, asarray, sort, amin
 from numpy.ma import masked_where
-from math import pi
-from scipy.stats import norm
+from math import pi, log
+from scipy.stats import norm, lognorm, rankdata
 import matplotlib.pyplot as plt
 from scipy.io import netcdf
 from arm_utilities import plotSfcRad, findTruncNormalRoots
@@ -210,8 +211,14 @@ reflectivity_copol = reflectivity_copol[ix_(time_range,height_range)]
 
 #pdb.set_trace()
 
+reflCompressed = reflectivity_copol[:,range_level].compressed()
+
+#dfser['ecdf_r']=(len(dfser)-dfser['rank']+1)/len(dfser)
+
+lenReflCompressed = len(reflCompressed)
+
 # Check whether there is cloud at the height level chosen for plotting time series
-if ( len( reflectivity_copol[:,range_level].compressed() ) == 0 ):
+if ( len( reflCompressed ) == 0 ):
     print "ERROR: Reflectivity time series at level %s has no values above the threshold!!!" %range_level 
     sys.exit(1)
 
@@ -227,6 +234,15 @@ if ( len( reflectivity_copol[:,range_level].compressed() ) == 0 ):
 #plt.show
 
 #pdb.set_trace()
+
+
+
+
+
+#plt.show()
+
+#sys.exit()
+
 
 #exit
 TIME, HEIGHT = meshgrid(height[height_range], 
@@ -254,8 +270,28 @@ plt.figure()
 radar_refl_nc.close()
 
 # Compute mean and variance of truncated time series
-truncMean = mean( reflectivity_copol[:,range_level].compressed() )
-truncVarnce = var( reflectivity_copol[:,range_level].compressed() )
+truncMean = mean( reflCompressed )
+truncVarnce = var( reflCompressed )
+
+# Compute empirical distribution function of data
+reflCompressedSorted = sort(reflCompressed)
+reflEdf = (rankdata(reflCompressedSorted) - 1)/lenReflCompressed
+
+
+
+plt.clf()
+
+plt.plot( reflCompressedSorted , reflEdf )
+plt.plot( reflCompressedSorted , 
+          norm.cdf( reflCompressedSorted, loc=truncMean, scale=sqrt(truncVarnce) )   )
+minRefl = amin(reflCompressedSorted)
+expMuLogN = (truncMean-minRefl)/sqrt(1+truncVarnce/((truncMean-minRefl)**2))
+sigma2LogN = log(1+truncVarnce/((truncMean-minRefl)**2))
+plt.plot( reflCompressedSorted , 
+          lognorm.cdf( reflCompressedSorted - minRefl, sqrt(sigma2LogN),
+                      loc=0, scale=expMuLogN )   )
+#                      loc=expMuLogN, scale=sqrt(sigma2LogN) )   )
+plt.figure()
 
 muInit = truncMean 
 sigmaInit = sqrt(truncVarnce)
@@ -282,18 +318,29 @@ plt.title('Height = %s m' %height[range_level] )
 
 # Plot histogram of copolar radar reflectivity
 plt.subplot(212)
-n, bins, patches = plt.hist(reflectivity_copol[:,range_level].compressed(), 
+n, bins, patches = plt.hist(reflCompressed, 
                             50, normed=True, histtype='stepfilled')
 plt.setp(patches, 'facecolor', 'g', 'alpha', 0.75)
 plt.xlabel('Copolar radar reflectivity')
 plt.ylabel('Probability')
-minRefl = min( reflectivity_copol[:,range_level].compressed() )
-maxRefl = max( reflectivity_copol[:,range_level].compressed() )
+minRefl = min( reflCompressed )
+maxRefl = max( reflCompressed )
 reflRange = linspace(minRefl,maxRefl)
 normCurve = plt.plot(reflRange, norm.pdf(reflRange,mu,sigma)/(1.0-norm.cdf((minRefl-mu)/sigma)))
-plt.figure()
+
 plt.show()
 
 #plt.close()
+
+
+
+
+
+
+
+
+
+
+
 
 #exit
