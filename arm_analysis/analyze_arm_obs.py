@@ -60,7 +60,7 @@ endTimeOfPlot = 86399
 radarType = "arscl"
 # Impose a threshold on reflectivity_copol to get rid of noise values
 if (radarType == "arscl"):
-    minThreshRefl = -56
+    minThreshRefl = -60
 else:
     minThreshRefl = -30
     
@@ -74,9 +74,9 @@ else:
 #date = 20131208    # Low drizzling Cu
 #date = 20131215    # No clouds
 #date = 20131217    # Noise
-date = 20150607     # Shallow Cu and some mid level clouds
+#date = 20150607     # Shallow Cu and some mid level clouds
 #date = 20150609     # Shallow Cu
-#date = 20150627     # Shallow Cu
+date = 20150627     # Shallow Cu
 
 if date == 20131204:
     # Radar showed low stratus on 20131204:
@@ -131,7 +131,7 @@ elif date == 20150607:
     elif ( radarType == "kazrCormd" ):
         radar_refl_file = data_dir + 'sgpkazrcormdC1.c1.20150607.000000.nc'
     # Grid level at which to plot time series and histogram    
-    range_level = 90 
+    range_level = 80 
     # Indices for range of altitudes for time-height plots
     height_range = arange(0,250)
     # Time and time step at which profile of reflectivity is plotted
@@ -162,7 +162,7 @@ elif date == 20150627:
         radar_refl_file = data_dir + 'sgpkazrcormdC1.c1.20150627.000000.nc'
 
     # Grid level at which to plot time series and histogram    
-    range_level = 75  
+    range_level = 95  
     # Indices for range of altitudes for time-height plots
     height_range = arange(0,200)
     # Time and time step at which profile of reflectivity is plotted
@@ -191,7 +191,9 @@ else:
 if ( radarType == "arscl" ):
     # To extract the data part of the object, use [:,:] instead of data
     reflectivity_copol = radar_refl_nc.variables['reflectivity_best_estimate'].data
+    # Pull the quality control flag from netcdf data
     qcRefl = radar_refl_nc.variables['qc_reflectivity_best_estimate'].data
+    # Mask out reflectivity values outside of cloud or rain
     reflectivity_copol = masked_where( qcRefl > 0, reflectivity_copol )
 else:
     reflectivity_copol = radar_refl_nc.variables['reflectivity_copol'].data
@@ -208,10 +210,8 @@ reflectivity_copol = reflectivity_copol[ix_(time_range,height_range)]
 
 #pdb.set_trace()
 
-# Remove small values from time series, thereby shortening vector length,
-# and convert to numpy array
-reflTrunc = asarray([x for x in reflectivity_copol[:,range_level] if x > minThreshRefl])
-if ( len(reflTrunc) == 0 ):
+# Check whether there is cloud at the height level chosen for plotting time series
+if ( len( reflectivity_copol[:,range_level].compressed() ) == 0 ):
     print "ERROR: Reflectivity time series at level %s has no values above the threshold!!!" %range_level 
     sys.exit(1)
 
@@ -237,6 +237,9 @@ plt.clf()
 radarContour = plt.pcolormesh(HEIGHT[:],TIME[:],reflectivity_copol)
 # Make a colorbar for the ContourSet returned by the contourf call.
 cbar = plt.colorbar(radarContour)
+# Plot horizontal line corresponding to time series plot later
+plt.plot( [ beginTimeOfPlot , endTimeOfPlot  ],  
+          [ height[range_level], height[range_level] ], 'k' )
 cbar.ax.set_ylabel('Reflectivity  [dBZ]')
 # Add the contour line levels to the colorbar
 #cbar.add_lines(radarContour)
@@ -245,12 +248,14 @@ plt.xlabel('Time  [' + time_offset_radar_refl.units + ']')
 plt.ylabel('Altitude  [m]')
 plt.figure()
 #plt.show()
+
+#pdb.set_trace()
                         
 radar_refl_nc.close()
 
 # Compute mean and variance of truncated time series
-truncMean = mean(reflTrunc)
-truncVarnce = var(reflTrunc)
+truncMean = mean( reflectivity_copol[:,range_level].compressed() )
+truncVarnce = var( reflectivity_copol[:,range_level].compressed() )
 
 muInit = truncMean 
 sigmaInit = sqrt(truncVarnce)
@@ -277,12 +282,13 @@ plt.title('Height = %s m' %height[range_level] )
 
 # Plot histogram of copolar radar reflectivity
 plt.subplot(212)
-n, bins, patches = plt.hist(reflTrunc[:], 50, normed=True, histtype='stepfilled')
+n, bins, patches = plt.hist(reflectivity_copol[:,range_level].compressed(), 
+                            50, normed=True, histtype='stepfilled')
 plt.setp(patches, 'facecolor', 'g', 'alpha', 0.75)
 plt.xlabel('Copolar radar reflectivity')
 plt.ylabel('Probability')
-minRefl = min(reflTrunc[:])
-maxRefl = max(reflTrunc[:])
+minRefl = min( reflectivity_copol[:,range_level].compressed() )
+maxRefl = max( reflectivity_copol[:,range_level].compressed() )
 reflRange = linspace(minRefl,maxRefl)
 normCurve = plt.plot(reflRange, norm.pdf(reflRange,mu,sigma)/(1.0-norm.cdf((minRefl-mu)/sigma)))
 plt.figure()
