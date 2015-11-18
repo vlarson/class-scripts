@@ -123,3 +123,20 @@ def deltaFnc(alpha,lambdaAlpha):
     """A utility function used to relate variance and sigma parameter of a truncated normal."""
     
     return lambdaAlpha * ( lambdaAlpha - alpha )
+    
+def findKSDn(cdf1, cdf2):
+    """Computes the Kolmogorov-Smirnov statistic, Dn.
+    
+    Used to determine if two distributions are different.
+    Inputs:
+    cdf1 = first cumulative distribution function
+    cdf2 = second cumulative distribution function
+    
+    Output:
+    Dn = KS statistic"""
+       
+    from numpy import abs, amax    
+    
+    Dn = amax( abs( cdf1 - cdf2 ) )
+            
+    return Dn

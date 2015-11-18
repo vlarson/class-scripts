@@ -11,7 +11,7 @@ from math import pi, log
 from scipy.stats import norm, lognorm, rankdata
 import matplotlib.pyplot as plt
 from scipy.io import netcdf
-from arm_utilities import plotSfcRad, findTruncNormalRoots
+from arm_utilities import plotSfcRad, findTruncNormalRoots, findKSDn
 import pdb
 import sys
 
@@ -75,9 +75,9 @@ else:
 #date = 20131208    # Low drizzling Cu
 #date = 20131215    # No clouds
 #date = 20131217    # Noise
-#date = 20150607     # Shallow Cu and some mid level clouds
+date = 20150607     # Shallow Cu and some mid level clouds
 #date = 20150609     # Shallow Cu
-date = 20150627     # Shallow Cu
+#date = 20150627     # Shallow Cu
 
 if date == 20131204:
     # Radar showed low stratus on 20131204:
@@ -132,7 +132,7 @@ elif date == 20150607:
     elif ( radarType == "kazrCormd" ):
         radar_refl_file = data_dir + 'sgpkazrcormdC1.c1.20150607.000000.nc'
     # Grid level at which to plot time series and histogram    
-    range_level = 80 
+    range_level = 90 #80 
     # Indices for range of altitudes for time-height plots
     height_range = arange(0,250)
     # Time and time step at which profile of reflectivity is plotted
@@ -222,6 +222,11 @@ if ( len( reflCompressed ) == 0 ):
     print "ERROR: Reflectivity time series at level %s has no values above the threshold!!!" %range_level 
     sys.exit(1)
 
+# Smallest and largest values of reflectivity, used for plots below
+minRefl = min( reflCompressed )
+maxRefl = max( reflCompressed )
+reflRange = linspace(minRefl,maxRefl)
+
 #pdb.set_trace()
 
 #plt.clf()
@@ -246,10 +251,10 @@ if ( len( reflCompressed ) == 0 ):
 
 #exit
 TIME, HEIGHT = meshgrid(height[height_range], 
-                        time_offset_radar_refl[time_range])
-# The numpy ix_ function is needed to extract the right part of the matrix 
-# either contourf or pcolormesh produces filled contours
+                        time_offset_radar_refl[time_range]) 
+plt.ion() # Use interactive mode so that program continues when plot appears
 plt.clf()
+# either contourf or pcolormesh produces filled contours
 radarContour = plt.pcolormesh(HEIGHT[:],TIME[:],reflectivity_copol)
 # Make a colorbar for the ContourSet returned by the contourf call.
 cbar = plt.colorbar(radarContour)
@@ -269,41 +274,66 @@ plt.figure()
                         
 radar_refl_nc.close()
 
+
+
 # Compute mean and variance of truncated time series
 truncMean = mean( reflCompressed )
 truncVarnce = var( reflCompressed )
+print "truncMean = %s"  %truncMean
+print "sqrt(truncVarnce) = %s"  %sqrt(truncVarnce)
+
+# Compute parameters of truncated normal distribution
+muInit = 2*truncMean 
+sigmaInit = 2*sqrt(truncVarnce)
+mu, sigma = findTruncNormalRoots(truncMean,truncVarnce,muInit,sigmaInit,minThreshRefl)
+print "mu = %s" %mu
+print "sigma = %s" %sigma
 
 # Compute empirical distribution function of data
 reflCompressedSorted = sort(reflCompressed)
 reflEdf = (rankdata(reflCompressedSorted) - 1)/lenReflCompressed
-
-
-
-plt.clf()
-
-plt.plot( reflCompressedSorted , reflEdf )
-plt.plot( reflCompressedSorted , 
-          norm.cdf( reflCompressedSorted, loc=truncMean, scale=sqrt(truncVarnce) )   )
+normCdf = norm.cdf( reflCompressedSorted, loc=truncMean, scale=sqrt(truncVarnce) )
+truncNormCdf = ( norm.cdf(reflCompressedSorted,mu,sigma) \
+                                      - norm.cdf((minRefl-mu)/sigma) ) \
+                          /(1.0-norm.cdf((minRefl-mu)/sigma))
 minRefl = amin(reflCompressedSorted)
 expMuLogN = (truncMean-minRefl)/sqrt(1+truncVarnce/((truncMean-minRefl)**2))
 sigma2LogN = log(1+truncVarnce/((truncMean-minRefl)**2))
+lognormCdf = lognorm.cdf( reflCompressedSorted - minRefl, sqrt(sigma2LogN),
+                      loc=0, scale=expMuLogN )
+
+#pdb.set_trace()
+
+DnNormCdf = findKSDn(normCdf, reflEdf)
+DnTruncNormCdf = findKSDn(truncNormCdf, reflEdf)
+DnLognormCdf = findKSDn(lognormCdf, reflEdf)
+print "KS statistic Dn"
+print "DnNormCdf = %s" %DnNormCdf
+print "DnTruncNormCdf = %s" %DnTruncNormCdf
+print "DnLognormCdf = %s" %DnLognormCdf
+
+plt.clf()
+
+# Plot cumulative distribution functions
+# Empirical CDF
+plt.plot( reflCompressedSorted , reflEdf, label="Empirical" )
+# Normal CDF
 plt.plot( reflCompressedSorted , 
-          lognorm.cdf( reflCompressedSorted - minRefl, sqrt(sigma2LogN),
-                      loc=0, scale=expMuLogN )   )
-#                      loc=expMuLogN, scale=sqrt(sigma2LogN) )   )
+          normCdf ,
+          label="Normal"   )
+# Truncated normal CDF
+truncNormCurve = plt.plot( reflCompressedSorted, 
+                          truncNormCdf ,
+                          label="Truncated normal")
+# Lognormal CDF
+plt.plot( reflCompressedSorted , 
+          lognormCdf ,
+          label="Lognorm" )
+plt.xlabel('Copolar radar reflectivity')
+plt.ylabel('Cumulative distribution function')
+plt.title('Height = %s m' %height[range_level] )
+plt.legend(loc="best")
 plt.figure()
-
-muInit = truncMean 
-sigmaInit = sqrt(truncVarnce)
-
-print "truncMean = %s"  %truncMean
-print "sqrt(truncVarnce) = %s"  %sqrt(truncVarnce)
-
-mu, sigma = findTruncNormalRoots(truncMean,truncVarnce,muInit,sigmaInit,minThreshRefl)
-
-print "mu = %s" %mu
-print "sigma = %s" %sigma
-
 
 # Plot time series of radar reflectivity
 plt.clf()
@@ -321,26 +351,25 @@ plt.subplot(212)
 n, bins, patches = plt.hist(reflCompressed, 
                             50, normed=True, histtype='stepfilled')
 plt.setp(patches, 'facecolor', 'g', 'alpha', 0.75)
+# Overplot best-fit truncated normal
+truncNormCurve = plt.plot(reflRange, 
+                          norm.pdf(reflRange,loc=mu,scale=sigma)/(1.0-norm.cdf((minRefl-mu)/sigma)), 
+                          label="Truncated normal")
+# Overplot best-fit normal
+normCurve = plt.plot( reflRange, 
+                     norm.pdf(reflRange,loc=truncMean,scale=sqrt(truncVarnce)) , 
+                     label="Normal" )
+# Overplot best-fit lognormal
+plt.plot( reflRange , 
+          lognorm.pdf( reflRange - minRefl, sqrt(sigma2LogN),
+                      loc=0, scale=expMuLogN )  , label="Lognormal" )
 plt.xlabel('Copolar radar reflectivity')
 plt.ylabel('Probability')
-minRefl = min( reflCompressed )
-maxRefl = max( reflCompressed )
-reflRange = linspace(minRefl,maxRefl)
-normCurve = plt.plot(reflRange, norm.pdf(reflRange,mu,sigma)/(1.0-norm.cdf((minRefl-mu)/sigma)))
+plt.legend()
 
-plt.show()
+#plt.show()
+plt.draw()
 
 #plt.close()
-
-
-
-
-
-
-
-
-
-
-
 
 #exit
