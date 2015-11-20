@@ -13,12 +13,12 @@ def drawStdNormalPoints(numSamples):
     from scipy.stats import norm
 
 #   Straight Monte Carlo
-#    uniformPoints = rand(numSamples)
+    uniformPoints = rand(numSamples)
 #    pdb.set_trace()
 
 # Latin hypercube sampling
-    PiLh = permutation(int(numSamples))
-    uniformPoints = (PiLh + rand(numSamples))/numSamples
+#    PiLh = permutation(int(numSamples))
+#    uniformPoints = (PiLh + rand(numSamples))/numSamples
 
     StdNormalPoints = norm.ppf(uniformPoints)
 
