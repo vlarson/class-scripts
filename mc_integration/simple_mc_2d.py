@@ -100,10 +100,12 @@ def calcNormalLognormalPDFValues(samplePoints,muN,sigmaN,muLNn,sigmaLNn,rhon):
     from numpy import zeros, exp, dot, copy, multiply, sqrt, log, pi
 
     xN = samplePoints[:,0]     # Column of normally distributed sample points
-    xLN = samplePoints[:,1]    # Column of lognormally distributed sample points
+    xLN = samplePoints[:,1]    # Column of lognormally distributed sample points, 
+                               #    left in lognormal space
 
     prefactor = 1.0 / ( 2.0 * pi * sigmaN * sigmaLNn \
-          * sqrt( 1.0 - rhon**2 ) * xLN ) 
+                        * sqrt( 1.0 - rhon**2 ) * xLN \
+                      ) 
 
     exponent = - ( 1.0 / ( 2.0 * ( 1.0 - rhon**2 ) ) ) \
            * (   ( 1.0 / sigmaN**2 ) * ( xN - muN )**2 \
@@ -112,9 +114,42 @@ def calcNormalLognormalPDFValues(samplePoints,muN,sigmaN,muLNn,sigmaLNn,rhon):
                + ( 1.0 / sigmaLNn**2 ) * ( log( xLN ) - muLNn )**2 \
               )
               
-    PDFValues =  multiply( prefactor, exponent )
+    PDFValues =  multiply( prefactor, exp( exponent ) )
 
     return PDFValues
+
+def calcWeightsArrayImp(samplePointsQ,muN,sigmaN,muLNn,sigmaLNn,rhon,
+                        muNQ,sigmaNQ,muLNnQ,sigmaLNnQ):
+    """Given a sample, return importance weights P(x)/q(x).
+    
+    Inputs:
+    samplePoints = a 2D array of sample points. Column 0 contains normally
+                    distributed points.  Column 1 contains lognormally 
+                    distributed points.
+    muN = mean of normal variate
+    sigmaN = standard deviation of normal variate
+    muLNn = mean of lognormal variate, transformed to normal space
+    sigmaLNn = standard deviation of lognormal variate, transformed to normal space
+    rhon = correlation between the 2 variates, transformed to normal space
+    muNDeltaImp = importance muN - muN
+    sigmaNDeltaImp = importance sigmaN - sigmaN
+    muLNnDeltaImp = importance muLNn - muLNn 
+    sigmaLNnDeltaImp = importance sigmaLNn - sigmaLNn    """
+
+    from numpy import divide
+
+    POfX = calcNormalLognormalPDFValues(samplePointsQ,
+                                        muN,sigmaN,muLNn,sigmaLNn,
+                                        rhon)
+
+    qOfX = calcNormalLognormalPDFValues(samplePointsQ,
+                                        muNQ,sigmaNQ,muLNnQ,sigmaLNnQ,
+                                        rhon)
+
+    weightsArrayImp = divide( POfX, qOfX ) 
+
+    return weightsArrayImp
+
         
 def computeFracRmseN(numSamples):
     """Return the fractional root-mean-square error 
@@ -123,7 +158,8 @@ def computeFracRmseN(numSamples):
     As we go, optionally produce plots."""    
     
     
-    from numpy import zeros, arange, copy, cov, corrcoef, any, nan, clip, finfo, amax
+    from numpy import zeros, arange, copy, cov, corrcoef, any, nan, \
+                            clip, finfo, amax, multiply, mean, divide, power
     from mc_utilities import computeRmse, calcFncValues, integrateFncValues
     from math import isnan
     import matplotlib.pyplot as plt 
@@ -141,12 +177,18 @@ def computeFracRmseN(numSamples):
     alphaDelta = -0.3  # Increment to alpha for control variates function, h
     betaDelta = -0.3  # Increment to beta for control variates function, h
 
+    # Importance sampling parameters: Importance values - Basic MC values
+    muChiDeltaImp = 1.4 * sigmaChi
+    sigmaChiDeltaImp = 0.0 * sigmaChi
+    muNcnDeltaImp = -1.0 * sigmaNcn
+    sigmaNcnDeltaImp = 0 * sigmaNcn
+
     numExperiments = 100#1000
     
     createCVScatterplots = False
 
     mcIntegral = zeros(numExperiments)
-    mcIntegralEvap = zeros(numExperiments)
+    mcIntegralImp = zeros(numExperiments)
     mcIntegralCV = zeros(numExperiments)
 
     analyticIntegral =  calcAutoconversionIntegral( muChi,sigmaChi,
@@ -163,8 +205,12 @@ def computeFracRmseN(numSamples):
                                                   )
     #print "Analytic calculation of CV integral = %s" % analyticIntegralCV
 
-#    pdb.set_trace()
+    muChiQ = muChi + muChiDeltaImp
+    sigmaChiQ = sigmaChi + sigmaChiDeltaImp
+    muNcnQ = muNcn + muNcnDeltaImp
+    sigmaNcnQ = sigmaNcn+sigmaNcnDeltaImp
 
+#    pdb.set_trace()
 
     for idx in arange(numExperiments):
 
@@ -176,11 +222,20 @@ def computeFracRmseN(numSamples):
                                                   rhoChiNcn)
 
 #        pdb.set_trace()    
-#        fncValuesArray = calcFncValues(numSamples,normalPoints,fncExpnt)    
+    
         fncValuesArray = calcFncValues(numSamples,fncDim,samplePoints,
                                        autoconversionRate,alpha,beta)
+        #    print"Function values = %s" % fncValuesArray
 
-#    print"Function values = %s" % fncValuesArray  
+        mcIntegral[idx] = integrateFncValues(fncValuesArray,numSamples)
+        #print "Monte Carlo estimate = %s" % mcIntegral[idx]
+
+        #########################################
+        #
+        # Calculate integral using control variates
+        #
+        ############################################
+
         fncValuesArrayCV = calcFncValues(numSamples,fncDim,samplePoints,
                                        autoconversionRate,alpha+alphaDelta,beta+betaDelta)                                       
 
@@ -200,10 +255,7 @@ def computeFracRmseN(numSamples):
         corrCV = corrcoef(fncValuesArray,fncValuesArrayCV)
 
         # pdb.set_trace()
-    
-        mcIntegral[idx] = integrateFncValues(fncValuesArray,numSamples)
-        #print "Monte Carlo estimate = %s" % mcIntegral[idx]
-        
+           
         mcIntegralCV[idx] = integrateFncValues(fncValuesArray-betaOpt*fncValuesArrayCV,numSamples) \
                             + betaOpt*analyticIntegralCV
         #print "CV Monte Carlo estimate = %s" % mcIntegralCV[idx] 
@@ -212,11 +264,51 @@ def computeFracRmseN(numSamples):
         if isnan(mcIntegralCV[idx]):
             pdb.set_trace()
 
-    
+
+        #########################################
+        #
+        # Calculate integral using importance sampling
+        #
+        ############################################
+
+        samplePointsQ = drawNormalLognormalPoints( numSamples,
+                                                  muChiQ,sigmaChiQ,muNcnQ,sigmaNcnQ,
+                                                  rhoChiNcn)
+
+        fncValuesArrayQ = calcFncValues(numSamples,fncDim,samplePointsQ,
+                                       autoconversionRate,alpha,beta)
+
+        fncValuesArrayCVQ = calcFncValues(numSamples,fncDim,samplePointsQ,
+                                       autoconversionRate,alpha+alphaDelta,beta+betaDelta)                                       
+
+        weightsArrayImp = calcWeightsArrayImp(samplePointsQ,
+                        muChi,sigmaChi,muNcn,sigmaNcn,rhoChiNcn,
+                        muChiQ,sigmaChiQ,muNcnQ,sigmaNcnQ)
+
+        # Effective sample size
+        neOnN = divide( (mean(weightsArrayImp))**2,
+                        mean(power(weightsArrayImp,2)) 
+                      )
+        print "Effective sample size = neOnN = %s" % neOnN
+ 
+        betaCVQ = 0.0
+        #betaCVQ = betaOpt
+
+        integrandArrayImp = multiply( fncValuesArrayQ-betaCVQ*fncValuesArrayCVQ, 
+                                     weightsArrayImp  )
+
+        mcIntegralImp[idx] = integrateFncValues(integrandArrayImp,numSamples) \
+                            + betaCVQ*analyticIntegralCV
+
+        #pdb.set_trace()
+   
     fracRmse = computeRmse(analyticIntegral,mcIntegral)/analyticIntegral
     print "Fractional RMSE of Monte Carlo estimate = %s" % fracRmse
 
 #    pdb.set_trace()
+    
+    fracRmseImp = computeRmse(analyticIntegral,mcIntegralImp)/analyticIntegral
+    print "Fractional RMSE of Monte Carlo estimate = %s" % fracRmse    
     
     fracRmseCV = computeRmse(analyticIntegral,mcIntegralCV)/analyticIntegral
     print "Fractional RMSE of CV Monte Carlo estimate = %s" % fracRmseCV    
@@ -234,15 +326,16 @@ def computeFracRmseN(numSamples):
 
 #    pdb.set_trace()
     
-    return (fracRmse, fracRmseCV, corrCV[0,1])    
+    return (fracRmse, fracRmseImp, fracRmseCV, corrCV[0,1])    
     
 def main():
-    from numpy import zeros, arange, sqrt, divide
+    from numpy import zeros, arange, sqrt, divide, abs
     import matplotlib.pyplot as plt
     
     numNValues = 10#20#10 # Number of trials with different sample size
 
-    fracRmseNValues = zeros(numNValues)    
+    fracRmseNValues = zeros(numNValues) 
+    fracRmseNValuesImp = zeros(numNValues)
     fracRmseNValuesCV = zeros(numNValues)
     corrCVNValues = zeros(numNValues)
     numSamplesN = zeros(numNValues)
@@ -250,7 +343,9 @@ def main():
     for idx in arange(numNValues):    
         numSamplesN[idx] =  2**(idx+2)
         print "numSamplesN = %s" % numSamplesN[idx]
-        fracRmseNValues[idx], fracRmseNValuesCV[idx], corrCVNValues[idx] =  computeFracRmseN(numSamplesN[idx])
+        fracRmseNValues[idx], fracRmseNValuesImp[idx], fracRmseNValuesCV[idx], \
+        corrCVNValues[idx] =  \
+            computeFracRmseN(numSamplesN[idx])
     
     theoryError = 10.0/sqrt(numSamplesN)    
 
@@ -259,6 +354,7 @@ def main():
     plt.clf()
 #    plt.subplot(221)
     plt.loglog(numSamplesN, fracRmseNValues, label='Fractional MC Error') 
+    plt.loglog(numSamplesN, fracRmseNValuesImp, label='Fractional Imp MC Error')
     plt.loglog(numSamplesN, fracRmseNValuesCV, label='Fractional CV MC Error')
     plt.loglog(numSamplesN, theoryError, label='Theory (1/sqrt(N))')
     plt.legend()
@@ -268,7 +364,7 @@ def main():
 
     plt.clf()
     plt.semilogx( numSamplesN, divide( fracRmseNValuesCV, fracRmseNValues ), label="Sample CV Err" )
-    plt.semilogx( numSamplesN, sqrt( 1 - corrCVNValues**2 ), label="sqrt(1-rho**2)" )
+    plt.semilogx( numSamplesN, sqrt( abs( 1 - corrCVNValues**2 ) ), label="sqrt(|1-rho**2|)" )
     plt.xlabel('Number of sample points')
     plt.ylabel('Data and theoretical estimate  [-]')
     plt.title('Control variate RMSE normalized by MC RMSE')
