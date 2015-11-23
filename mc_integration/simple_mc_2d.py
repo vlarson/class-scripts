@@ -118,14 +118,18 @@ def calcNormalLognormalPDFValues(samplePoints,muN,sigmaN,muLNn,sigmaLNn,rhon):
 
     return PDFValues
 
-def calcWeightsArrayImp(samplePointsQ,muN,sigmaN,muLNn,sigmaLNn,rhon,
+def calcWeightsArrayImp(samplePointsQ,alphaDefQ,
+                        muN,sigmaN,muLNn,sigmaLNn,rhon,
                         muNQ,sigmaNQ,muLNnQ,sigmaLNnQ):
     """Given a sample, return importance weights P(x)/q(x).
     
     Inputs:
-    samplePoints = a 2D array of sample points. Column 0 contains normally
-                    distributed points.  Column 1 contains lognormally 
-                    distributed points.
+    samplePointsQ = a 2D array of sample points of size numSamples. 
+                    Column 0 contains normally distributed points.  
+                    Column 1 contains lognormally distributed points.  
+                    First numSamplesDefP points in array come from P(x).
+    alphaDefQ = Fraction of samples drawn from q(x) rather than P(x)
+    numSamplesDefP = Number of samples drawn from P(x) rather than q(x)
     muN = mean of normal variate
     sigmaN = standard deviation of normal variate
     muLNn = mean of lognormal variate, transformed to normal space
@@ -146,7 +150,11 @@ def calcWeightsArrayImp(samplePointsQ,muN,sigmaN,muLNn,sigmaLNn,rhon,
                                         muNQ,sigmaNQ,muLNnQ,sigmaLNnQ,
                                         rhon)
 
-    weightsArrayImp = divide( POfX, qOfX ) 
+    qOfXAlpha = alphaDefQ * qOfX + (1-alphaDefQ) * POfX
+
+    weightsArrayImp = divide( POfX, qOfXAlpha ) 
+
+    #pdb.set_trace()
 
     return weightsArrayImp
 
@@ -159,10 +167,12 @@ def computeFracRmseN(numSamples):
     
     
     from numpy import zeros, arange, copy, cov, corrcoef, any, nan, \
-                            clip, finfo, amax, multiply, mean, divide, power
+                            clip, finfo, amax, multiply, mean, divide, power, \
+                            floor, concatenate
     from mc_utilities import computeRmse, calcFncValues, integrateFncValues
     from math import isnan
-    import matplotlib.pyplot as plt 
+    import matplotlib.pyplot as plt
+    import sys
 
 #    print("In computeRmseN")
     fncDim = 2  # Dimension of uni- or multi-variate integrand function
@@ -178,10 +188,13 @@ def computeFracRmseN(numSamples):
     betaDelta = -0.3  # Increment to beta for control variates function, h
 
     # Importance sampling parameters: Importance values - Basic MC values
-    muChiDeltaImp = 1.4 * sigmaChi
-    sigmaChiDeltaImp = 0.0 * sigmaChi
+    muChiDeltaImp = 1.8 * sigmaChi  # 1.4 * sigmaChi
+    sigmaChiDeltaImp = -0.00 * sigmaChi
     muNcnDeltaImp = -1.0 * sigmaNcn
-    sigmaNcnDeltaImp = 0 * sigmaNcn
+    sigmaNcnDeltaImp = -0.00 * sigmaNcn
+    
+    # Defensive sampling parameter
+    alphaDefQ = 0.5  # Fraction of points drawn from q(x) rather than P(x)
 
     numExperiments = 100#1000
     
@@ -267,13 +280,32 @@ def computeFracRmseN(numSamples):
 
         #########################################
         #
-        # Calculate integral using importance sampling
+        # Calculate integral using importance sampling (+ control variate)
         #
         ############################################
 
-        samplePointsQ = drawNormalLognormalPoints( numSamples,
+        # Number of samples drawn from q(x) ( and not P(x) ) in defensive importance sampling
+        numSamplesDefQ = floor( alphaDefQ * numSamples ) 
+
+        # Number of samples drawn from q(x) ( and not P(x) ) in defensive importance sampling
+        numSamplesDefP = numSamples-numSamplesDefQ 
+        
+        # Draw numSamplesDefQ samples from q(x), without including defensive points from P(x)
+        samplePointsQOnly = drawNormalLognormalPoints( numSamplesDefQ,
                                                   muChiQ,sigmaChiQ,muNcnQ,sigmaNcnQ,
                                                   rhoChiNcn)
+
+        # Concatenate sample points drawn from q(x) and P(x) 
+        # P(x) points come first
+        samplePointsQ = concatenate( ( samplePoints[0:numSamplesDefP,:], samplePointsQOnly ),
+                                    axis=0 )   # Add rows to the bottom of the 2-column array                                     
+
+        #pdb.set_trace()
+                                    
+        # Assertion check:
+        if ( samplePointsQ.shape != samplePoints.shape  ):
+            print "ERROR: Defensive importance sampling generates the wrong number of sample points!!!!" 
+            sys.exit(1)        
 
         fncValuesArrayQ = calcFncValues(numSamples,fncDim,samplePointsQ,
                                        autoconversionRate,alpha,beta)
@@ -281,7 +313,7 @@ def computeFracRmseN(numSamples):
         fncValuesArrayCVQ = calcFncValues(numSamples,fncDim,samplePointsQ,
                                        autoconversionRate,alpha+alphaDelta,beta+betaDelta)                                       
 
-        weightsArrayImp = calcWeightsArrayImp(samplePointsQ,
+        weightsArrayImp = calcWeightsArrayImp(samplePointsQ,alphaDefQ,
                         muChi,sigmaChi,muNcn,sigmaNcn,rhoChiNcn,
                         muChiQ,sigmaChiQ,muNcnQ,sigmaNcnQ)
 
@@ -289,10 +321,10 @@ def computeFracRmseN(numSamples):
         neOnN = divide( (mean(weightsArrayImp))**2,
                         mean(power(weightsArrayImp,2)) 
                       )
-        print "Effective sample size = neOnN = %s" % neOnN
+        #print "Effective sample size = neOnN = %s" % neOnN
  
         betaCVQ = 0.0
-        #betaCVQ = betaOpt
+        #betaCVQ = betaOpt # betaOpt is the optimal beta for non-importance sampling
 
         integrandArrayImp = multiply( fncValuesArrayQ-betaCVQ*fncValuesArrayCVQ, 
                                      weightsArrayImp  )
