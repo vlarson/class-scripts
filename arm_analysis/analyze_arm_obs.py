@@ -5,10 +5,12 @@
 
 # Import libraries
 from numpy import fmax, arange, meshgrid, ix_, sqrt, mean, var 
-from numpy import linspace, asarray, sort, amin
+from numpy import linspace, asarray, sort, amin, zeros
 from numpy.ma import masked_where
+from numpy.ma import MaskedArray
 from math import pi, log
-from scipy.stats import norm, lognorm, rankdata
+from scipy.stats import norm, lognorm
+from scipy.stats.mstats import rankdata
 import matplotlib.pyplot as plt
 from scipy.io import netcdf
 from arm_utilities import plotSfcRad, findTruncNormalRoots, findKSDn
@@ -50,13 +52,21 @@ min_sdn = 10
 # Default values
 # Grid level at which to plot time series and histogram
 range_level = 117
-# Time and time step at which profile of reflectivity is plotted
+# Time at which profile of reflectivity is plotted
 time_of_cloud = 69000 
+# Number of profiles of reflectivity to be plotted
+numProfiles = 5
 # Indices for range of altitudes for time-height plots
 height_range = arange(0,200)
 # Indices for range of times for time-height plots
 beginTimeOfPlot = 1
 endTimeOfPlot = 86399
+# Range of times in seconds for vertical overlap analysis
+beginTimeOfCloud = 70000
+endTimeOfCloud = 80000
+# Range of altitudes in meters for vertical overlap analysis
+cloudBaseHeight = 2000
+cloudTopHeight = 3000
 # If lArscl = True, then we want to use the ARSCL radar retrieval
 radarType = "arscl"
 # Impose a threshold on reflectivity_copol to get rid of noise values
@@ -75,9 +85,9 @@ else:
 #date = 20131208    # Low drizzling Cu
 #date = 20131215    # No clouds
 #date = 20131217    # Noise
-date = 20150607     # Shallow Cu and some mid level clouds
+#date = 20150607     # Shallow Cu and some mid level clouds
 #date = 20150609     # Shallow Cu
-#date = 20150627     # Shallow Cu
+date = 20150627     # Shallow Cu
 
 if date == 20131204:
     # Radar showed low stratus on 20131204:
@@ -132,11 +142,19 @@ elif date == 20150607:
     elif ( radarType == "kazrCormd" ):
         radar_refl_file = data_dir + 'sgpkazrcormdC1.c1.20150607.000000.nc'
     # Grid level at which to plot time series and histogram    
-    range_level = 90 #80 
+    range_level = 80 
     # Indices for range of altitudes for time-height plots
-    height_range = arange(0,250)
-    # Time and time step at which profile of reflectivity is plotted
-    time_of_cloud = 43200
+    height_range = arange(0,100)
+    beginTimeOfPlot = 68000
+    endTimeOfPlot = 80000
+    # Time at which profile of reflectivity is plotted
+    time_of_cloud = 78800 #78450
+    # Range of times in seconds for vertical overlap analysis
+    beginTimeOfCloud = 78000
+    endTimeOfCloud = 79000
+    # Range of altitudes in meters for vertical overlap analysis
+    cloudBaseHeight = 2500
+    cloudTopHeight = 2800
 elif date == 20150609:
     radarType = "arscl"
     # Radar could see strong clouds up to 8 km on 20131205:
@@ -151,7 +169,13 @@ elif date == 20150609:
     # Indices for range of altitudes for time-height plots
     height_range = arange(0,150)
     # Time and time step at which profile of reflectivity is plotted
-    time_of_cloud = 43200
+    time_of_cloud = 66000 #76000
+    # Range of times in seconds for vertical overlap analysis
+    beginTimeOfCloud = 63000
+    endTimeOfCloud = 78000
+    # Range of altitudes in meters for vertical overlap analysis
+    cloudBaseHeight = 2600
+    cloudTopHeight = 3500
 elif date == 20150627:
     radarType = "arscl"
     # Radar could see strong clouds up to 8 km on 20131205:
@@ -161,13 +185,18 @@ elif date == 20150627:
         radar_refl_file = data_dir + 'sgpkazrcorgeC1.c1.20150627.000000.nc'
     elif ( radarType == "kazrCormd" ):
         radar_refl_file = data_dir + 'sgpkazrcormdC1.c1.20150627.000000.nc'
-
     # Grid level at which to plot time series and histogram    
     range_level = 95  
     # Indices for range of altitudes for time-height plots
     height_range = arange(0,200)
     # Time and time step at which profile of reflectivity is plotted
-    time_of_cloud = 43200
+    time_of_cloud = 75000 #66000 
+    # Range of times in seconds for vertical overlap analysis
+    beginTimeOfCloud = 63000
+    endTimeOfCloud = 78000
+    # Range of altitudes in meters for vertical overlap analysis
+    cloudBaseHeight = 2200
+    cloudTopHeight = 3500
 else:
     print "Wrong date"
 
@@ -176,11 +205,18 @@ radar_refl_nc = netcdf.netcdf_file(radar_refl_file, 'r')
 
 time_offset_radar_refl = radar_refl_nc.variables['time_offset']
 
-#timestep_of_cloud = (abs(time_offset_radar_refl[:]-time_of_cloud)).argmin()
+# Compute beginning and ending time steps for time series and time-height plots
 beginTimestepOfPlot = (abs(time_offset_radar_refl[:]-beginTimeOfPlot)).argmin()
 endTimestepOfPlot = (abs(time_offset_radar_refl[:]-endTimeOfPlot)).argmin()
-
 time_range = arange(beginTimestepOfPlot,endTimestepOfPlot)
+
+# Compute time step for profile of snapshot
+timestep_of_cloud = (abs(time_offset_radar_refl[:]-time_of_cloud)).argmin()
+                    
+# Compute beginning and ending time steps for block of cloud for overlap analysis
+beginTimestepOfCloud = (abs(time_offset_radar_refl[:]-beginTimeOfCloud)).argmin()
+endTimestepOfCloud = (abs(time_offset_radar_refl[:]-endTimeOfCloud)).argmin()
+timestepRangeCloud = arange(beginTimestepOfCloud,endTimestepOfCloud)
 
 if ( radarType == "arscl" ):
     height = radar_refl_nc.variables['height'].data
@@ -188,6 +224,11 @@ else:
     height = radar_refl_nc.variables['range'].data
     #range_gate_spacing = 29.979246
     #height = arange(0, 676*range_gate_spacing-1, range_gate_spacing)        
+
+# Compute top and bottom grid levels for block of cloud for overlap analysis
+cloudBaseLevel = (abs(height[:]-cloudBaseHeight)).argmin()
+cloudTopLevel = (abs(height[:]-cloudTopHeight)).argmin()
+levelRangeCloud = arange(cloudBaseLevel,cloudTopLevel)
 
 if ( radarType == "arscl" ):
     # To extract the data part of the object, use [:,:] instead of data
@@ -202,16 +243,19 @@ else:
 #pdb.set_trace()
 
 # The numpy ix_ function is needed to extract the right part of the matrix
-reflectivity_copol = reflectivity_copol[ix_(time_range,height_range)]
+reflCopol = reflectivity_copol[ix_(time_range,height_range)]
+
+# Block of cloud values for overlap analysis
+reflCloudBlock = reflectivity_copol[ix_(timestepRangeCloud,levelRangeCloud)]
 
 #pdb.set_trace()
 
 # Replace small values with threshold in order to reduce the range of values to plot
-#reflectivity_copol = fmax(minThreshRefl,reflectivity_copol[:])
+#reflCopol = fmax(minThreshRefl,reflCopol[:])
 
 #pdb.set_trace()
 
-reflCompressed = reflectivity_copol[:,range_level].compressed()
+reflCompressed = reflCopol[:,range_level].compressed()
 
 #dfser['ecdf_r']=(len(dfser)-dfser['rank']+1)/len(dfser)
 
@@ -229,24 +273,7 @@ reflRange = linspace(minRefl,maxRefl)
 
 #pdb.set_trace()
 
-#plt.clf()
-#
-#
-#plt.plot(reflectivity_copol[timestep_of_cloud,:],height[:])
-#plt.xlabel('Copolar radar reflectivity')
-#plt.ylabel('Altitude  [m]')
-#plt.figure()
-#plt.show
 
-#pdb.set_trace()
-
-
-
-
-
-#plt.show()
-
-#sys.exit()
 
 
 #exit
@@ -255,15 +282,25 @@ TIME, HEIGHT = meshgrid(height[height_range],
 plt.ion() # Use interactive mode so that program continues when plot appears
 plt.clf()
 # either contourf or pcolormesh produces filled contours
-radarContour = plt.pcolormesh(HEIGHT[:],TIME[:],reflectivity_copol)
+radarContour = plt.pcolormesh(HEIGHT[:],TIME[:],reflCopol)
 # Make a colorbar for the ContourSet returned by the contourf call.
 cbar = plt.colorbar(radarContour)
-# Plot horizontal line corresponding to time series plot later
-plt.plot( [ beginTimeOfPlot , endTimeOfPlot  ],  
-          [ height[range_level], height[range_level] ], 'k' )
 cbar.ax.set_ylabel('Reflectivity  [dBZ]')
 # Add the contour line levels to the colorbar
 #cbar.add_lines(radarContour)
+# Plot horizontal line corresponding to time series plot later
+plt.plot( [ beginTimeOfPlot , endTimeOfPlot  ],  
+          [ height[range_level], height[range_level] ], 'k' )
+#pdb.set_trace()
+# Plot vertical line corresponding to slice
+plt.plot( [ time_of_cloud , time_of_cloud  ],  
+          [ height[height_range[0]], height[height_range[len(height_range)-1]]  ], 'k' )
+# Plot box corresponding to cloud box
+plt.plot( [ beginTimeOfCloud , beginTimeOfCloud ],  [ cloudBaseHeight, cloudTopHeight ], 'k' )
+plt.plot( [ endTimeOfCloud , endTimeOfCloud ],  [ cloudBaseHeight, cloudTopHeight ], 'k' )
+plt.plot( [ beginTimeOfCloud , endTimeOfCloud ],  [ cloudBaseHeight, cloudBaseHeight ], 'k' )
+plt.plot( [ beginTimeOfCloud , endTimeOfCloud ],  [ cloudTopHeight, cloudTopHeight ], 'k' )
+
 plt.title('Radar reflectivity')
 plt.xlabel('Time  [' + time_offset_radar_refl.units + ']')
 plt.ylabel('Altitude  [m]')
@@ -271,10 +308,65 @@ plt.figure()
 #plt.show()
 
 #pdb.set_trace()
+
+lenTimestepRangeCloud = len(timestepRangeCloud)
+lenLevelRangeCloud = len(levelRangeCloud)
+uniformCloudBlock = zeros((lenTimestepRangeCloud,lenLevelRangeCloud))
+for col in range(0,lenLevelRangeCloud):
+    uniformCloudBlock[:,col] = rankdata(reflCloudBlock[:,col]) /    \
+                                MaskedArray.count(reflCloudBlock[:,col])
+
+#pdb.set_trace()
+#plt.ion() # Use interactive mode so that program continues when plot appears
+plt.clf()
+plt.subplot(121)
+#pdb.set_trace()
+for idx in range(0,numProfiles):
+    plt.plot(reflCopol[timestep_of_cloud-beginTimestepOfPlot+idx,levelRangeCloud],
+             height[levelRangeCloud],'-o')
+plt.ylim(height[levelRangeCloud[0]], height[levelRangeCloud[len(levelRangeCloud)-1]])
+plt.xlabel('Copolar radar reflectivity')
+plt.ylabel('Altitude  [m]')
+
+plt.subplot(122)
+for idx in range(0,numProfiles):
+    plt.plot(uniformCloudBlock[timestep_of_cloud-beginTimestepOfCloud+idx,:],
+             height[levelRangeCloud],'-o')
+plt.ylim(height[levelRangeCloud[0]], height[levelRangeCloud[len(levelRangeCloud)-1]])
+plt.xlabel('Uniform distribution of reflectivity')
+plt.ylabel('Altitude  [m]')
+plt.figure()
+
+
+
+#plt.clf()
+##pdb.set_trace()
+#for idx in range(0,lenTimestepRangeCloud):
+#    plt.plot(uniformCloudBlock[idx,:],
+#             height[levelRangeCloud],'-o')
+#plt.xlabel('Copolar radar reflectivity')
+#plt.ylabel('Altitude  [m]')
+#plt.figure()
+
+
+
+
+plt.clf()
+TIMECLD, HEIGHTCLD = meshgrid(height[levelRangeCloud], 
+                        time_offset_radar_refl[timestepRangeCloud]) 
+# either contourf or pcolormesh produces filled contours
+uniformCloudBlockContour = plt.pcolormesh(HEIGHTCLD[:],TIMECLD[:],uniformCloudBlock)
+# Make a colorbar for the ContourSet returned by the contourf call.
+cbar = plt.colorbar(uniformCloudBlockContour)
+cbar.ax.set_ylabel('Normalized Reflectivity  []')
+# Add the contour line levels to the colorbar
+#cbar.add_lines(radarContour)
+plt.title('Normalized reflectivity')
+plt.xlabel('Time  [' + time_offset_radar_refl.units + ']')
+plt.ylabel('Altitude  [m]')
+plt.figure()
                         
 radar_refl_nc.close()
-
-
 
 # Compute mean and variance of truncated time series
 truncMean = mean( reflCompressed )
@@ -338,8 +430,8 @@ plt.figure()
 # Plot time series of radar reflectivity
 plt.clf()
 plt.subplot(211)
-plt.plot(time_offset_radar_refl[time_range],reflectivity_copol[:,range_level].data)
-plt.ylim((minThreshRefl,1.1*max(reflectivity_copol[:,range_level]).data))
+plt.plot(time_offset_radar_refl[time_range],reflCopol[:,range_level].data)
+plt.ylim((minThreshRefl,1.1*max(reflCopol[:,range_level]).data))
 plt.xlabel('Time [' + time_offset_radar_refl.units + ']')
 plt.ylabel('Copolar radar reflectivity')
 plt.title('Height = %s m' %height[range_level] )
