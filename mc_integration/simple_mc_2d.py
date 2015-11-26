@@ -179,7 +179,7 @@ def computeFracRmseN(numSamples):
     muChi = 0
     sigmaChi = 1
     muNcn = 0
-    sigmaNcn = 1.5
+    sigmaNcn = 0.5
     rhoChiNcn = 0.5
     alpha = 2.47 #2.47
     beta = -1.79 #-1.79

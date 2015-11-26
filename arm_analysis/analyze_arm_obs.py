@@ -85,9 +85,9 @@ else:
 #date = 20131208    # Low drizzling Cu
 #date = 20131215    # No clouds
 #date = 20131217    # Noise
-#date = 20150607     # Shallow Cu and some mid level clouds
+date = 20150607     # Shallow Cu and some mid level clouds
 #date = 20150609     # Shallow Cu
-date = 20150627     # Shallow Cu
+#date = 20150627     # Shallow Cu
 
 if date == 20131204:
     # Radar showed low stratus on 20131204:
@@ -148,7 +148,7 @@ elif date == 20150607:
     beginTimeOfPlot = 68000
     endTimeOfPlot = 80000
     # Time at which profile of reflectivity is plotted
-    time_of_cloud = 78800 #78450
+    time_of_cloud = 78410# 78800 #78450
     # Range of times in seconds for vertical overlap analysis
     beginTimeOfCloud = 78000
     endTimeOfCloud = 79000
@@ -190,7 +190,9 @@ elif date == 20150627:
     # Indices for range of altitudes for time-height plots
     height_range = arange(0,200)
     # Time and time step at which profile of reflectivity is plotted
-    time_of_cloud = 75000 #66000 
+    time_of_cloud = 67200 # At this time, the profile is highly correlated 
+    time_of_cloud = 69400 # At this time, the profile is not well correlated
+    time_of_cloud = 66300 #75000 #66000
     # Range of times in seconds for vertical overlap analysis
     beginTimeOfCloud = 63000
     endTimeOfCloud = 78000
@@ -273,9 +275,6 @@ reflRange = linspace(minRefl,maxRefl)
 
 #pdb.set_trace()
 
-
-
-
 #exit
 TIME, HEIGHT = meshgrid(height[height_range], 
                         time_offset_radar_refl[time_range]) 
@@ -292,7 +291,7 @@ cbar.ax.set_ylabel('Reflectivity  [dBZ]')
 plt.plot( [ beginTimeOfPlot , endTimeOfPlot  ],  
           [ height[range_level], height[range_level] ], 'k' )
 #pdb.set_trace()
-# Plot vertical line corresponding to slice
+# Plot vertical line corresponding to histogram of reflectivity
 plt.plot( [ time_of_cloud , time_of_cloud  ],  
           [ height[height_range[0]], height[height_range[len(height_range)-1]]  ], 'k' )
 # Plot box corresponding to cloud box
@@ -315,6 +314,8 @@ uniformCloudBlock = zeros((lenTimestepRangeCloud,lenLevelRangeCloud))
 for col in range(0,lenLevelRangeCloud):
     uniformCloudBlock[:,col] = rankdata(reflCloudBlock[:,col]) /    \
                                 MaskedArray.count(reflCloudBlock[:,col])
+
+uniformCloudBlock = masked_where( uniformCloudBlock == 0, uniformCloudBlock )
 
 #pdb.set_trace()
 #plt.ion() # Use interactive mode so that program continues when plot appears
@@ -361,6 +362,13 @@ cbar = plt.colorbar(uniformCloudBlockContour)
 cbar.ax.set_ylabel('Normalized Reflectivity  []')
 # Add the contour line levels to the colorbar
 #cbar.add_lines(radarContour)
+# Plot horizontal line corresponding to time series plot later
+plt.plot( [ beginTimeOfCloud , endTimeOfCloud  ],  
+          [ height[range_level], height[range_level] ], 'k' )
+#pdb.set_trace()
+# Plot vertical line corresponding to histogram of reflectivity
+plt.plot( [ time_of_cloud , time_of_cloud  ],  
+          [ height[levelRangeCloud[0]], height[levelRangeCloud[len(levelRangeCloud)-1]]  ], 'k' )
 plt.title('Normalized reflectivity')
 plt.xlabel('Time  [' + time_offset_radar_refl.units + ']')
 plt.ylabel('Altitude  [m]')
