@@ -140,3 +140,34 @@ def findKSDn(cdf1, cdf2):
     Dn = amax( abs( cdf1 - cdf2 ) )
             
     return Dn
+    
+def calcMeanAlbedo(reflCloudBlockFilled):
+    """Calculate mean albedo of cloud layer, which depends on vertical overlap.
+    
+    Inputs:
+    reflCloudBlockFilled = Block of cloud reflectivity values - minimum reflectivity.
+                           Out-of-cloud values are filled with 0.
+                           Each column is an altitude level.  
+                           Each row is a vertical profile at a different time.
+    reflCloudBlockMin = minimum of all cloud elements of reflCloudBlockFilled
+    
+    Output:
+    meanAlbedo = average reflectivity of cloud layer"""
+
+    from numpy import std, sqrt, mean 
+    import pdb
+
+    # Sum reflectivity in vertical
+    meanReflCloudBlockFilled = mean(reflCloudBlockFilled,axis=1) 
+    # LWC = Liquid water content
+    LWC = sqrt(meanReflCloudBlockFilled) 
+    stdLWC = std(LWC)
+    # tau = optical depth
+    tau = LWC**(2.0/3.0)
+    # albedo = cloud reflectivity, 0 <= albedo <= 1
+    albedo = tau / (9.0 + tau)
+    meanAlbedo = mean(albedo)
+    
+    #pdb.set_trace()
+    
+    return (meanAlbedo, LWC, stdLWC)

@@ -4,16 +4,16 @@
 """
 
 # Import libraries
-from numpy import fmax, arange, meshgrid, ix_, sqrt, mean, var 
-from numpy import linspace, asarray, sort, amin, zeros
-from numpy.ma import masked_where
+from numpy import fmax, arange, meshgrid, ix_, sqrt, mean, var, std 
+from numpy import linspace, asarray, sort, amin, zeros, isclose
+from numpy.ma import masked_where, filled
 from numpy.ma import MaskedArray
 from math import pi, log
-from scipy.stats import norm, lognorm
+from scipy.stats import norm, lognorm, skew
 from scipy.stats.mstats import rankdata
 import matplotlib.pyplot as plt
 from scipy.io import netcdf
-from arm_utilities import plotSfcRad, findTruncNormalRoots, findKSDn
+from arm_utilities import plotSfcRad, findTruncNormalRoots, findKSDn, calcMeanAlbedo
 import pdb
 import sys
 
@@ -142,19 +142,19 @@ elif date == 20150607:
     elif ( radarType == "kazrCormd" ):
         radar_refl_file = data_dir + 'sgpkazrcormdC1.c1.20150607.000000.nc'
     # Grid level at which to plot time series and histogram    
-    range_level = 80 
+    range_level = 75 #80 
     # Indices for range of altitudes for time-height plots
     height_range = arange(0,100)
     beginTimeOfPlot = 68000
     endTimeOfPlot = 80000
     # Time at which profile of reflectivity is plotted
-    time_of_cloud = 78410# 78800 #78450
+    time_of_cloud = 71000 #78410# 78800 #78450
     # Range of times in seconds for vertical overlap analysis
-    beginTimeOfCloud = 78000
-    endTimeOfCloud = 79000
+    beginTimeOfCloud = 70000#70000#78000
+    endTimeOfCloud = 79000 #72000#79000
     # Range of altitudes in meters for vertical overlap analysis
-    cloudBaseHeight = 2500
-    cloudTopHeight = 2800
+    cloudBaseHeight = 2250#2500
+    cloudTopHeight = 2600#2800
 elif date == 20150609:
     radarType = "arscl"
     # Radar could see strong clouds up to 8 km on 20131205:
@@ -186,7 +186,7 @@ elif date == 20150627:
     elif ( radarType == "kazrCormd" ):
         radar_refl_file = data_dir + 'sgpkazrcormdC1.c1.20150627.000000.nc'
     # Grid level at which to plot time series and histogram    
-    range_level = 95  
+    range_level = 95
     # Indices for range of altitudes for time-height plots
     height_range = arange(0,200)
     # Time and time step at which profile of reflectivity is plotted
@@ -232,6 +232,9 @@ cloudBaseLevel = (abs(height[:]-cloudBaseHeight)).argmin()
 cloudTopLevel = (abs(height[:]-cloudTopHeight)).argmin()
 levelRangeCloud = arange(cloudBaseLevel,cloudTopLevel)
 
+lenTimestepRangeCloud = len(timestepRangeCloud)
+lenLevelRangeCloud = len(levelRangeCloud)
+
 if ( radarType == "arscl" ):
     # To extract the data part of the object, use [:,:] instead of data
     reflectivity_copol = radar_refl_nc.variables['reflectivity_best_estimate'].data
@@ -257,7 +260,8 @@ reflCloudBlock = reflectivity_copol[ix_(timestepRangeCloud,levelRangeCloud)]
 
 #pdb.set_trace()
 
-reflCompressed = reflCopol[:,range_level].compressed()
+#reflCompressed = reflCopol[:,range_level].compressed()
+reflCompressed = reflCloudBlock[:,range_level-cloudBaseLevel].compressed()
 
 #dfser['ecdf_r']=(len(dfser)-dfser['rank']+1)/len(dfser)
 
@@ -274,6 +278,34 @@ maxRefl = max( reflCompressed )
 reflRange = linspace(minRefl,maxRefl)
 
 #pdb.set_trace()
+
+# Compute effect of vertical overlap on radiation
+# To do so, sum reflectivity from each profile, using original and sorted cloud data
+# Compute the standard deviation in the sum
+reflCloudBlockMin = amin(reflCloudBlock)
+reflCloudBlockOffset = reflCloudBlock - reflCloudBlockMin
+reflCloudBlockFilled = filled(reflCloudBlockOffset,fill_value=0)
+# Compute maximal overlap by sorting each altitude level individually
+reflCloudBlockFilledSorted = zeros((lenTimestepRangeCloud,lenLevelRangeCloud))
+for col in range(0,lenLevelRangeCloud):
+    reflCloudBlockFilledSorted[:,col] = sort(reflCloudBlockFilled[:,col]) 
+# Assertion check
+if ( not( isclose( mean( mean(reflCloudBlockFilled) ), mean( mean(reflCloudBlockFilledSorted) ) ) ) ):
+    print "ERROR: Computing maximal overlap failed!!! %s != %s" \
+            % (mean( mean(reflCloudBlockFilled) ) , mean( mean(reflCloudBlockFilledSorted) ))  
+    sys.exit(1)
+    
+meanAlbedoUnsorted, LWCUnsorted, stdLWCUnsorted \
+                = calcMeanAlbedo(reflCloudBlockFilled)
+
+meanAlbedoSorted, LWCSorted, stdLWCSorted \
+                 = calcMeanAlbedo(reflCloudBlockFilledSorted)
+
+print "            Unsorted       Sorted"
+print "Mean Albedo:  %s   %s " %(meanAlbedoUnsorted,  meanAlbedoSorted)
+print "Stdev LWC:    %s   %s "   %(stdLWCUnsorted,  stdLWCSorted)
+
+pdb.set_trace()
 
 #exit
 TIME, HEIGHT = meshgrid(height[height_range], 
@@ -308,8 +340,9 @@ plt.figure()
 
 #pdb.set_trace()
 
-lenTimestepRangeCloud = len(timestepRangeCloud)
-lenLevelRangeCloud = len(levelRangeCloud)
+
+# uniformCloudBlock = close-up selection of contiguous cloud values.  
+# Each column is a different altitude.
 uniformCloudBlock = zeros((lenTimestepRangeCloud,lenLevelRangeCloud))
 for col in range(0,lenLevelRangeCloud):
     uniformCloudBlock[:,col] = rankdata(reflCloudBlock[:,col]) /    \
@@ -442,7 +475,8 @@ plt.plot(time_offset_radar_refl[time_range],reflCopol[:,range_level].data)
 plt.ylim((minThreshRefl,1.1*max(reflCopol[:,range_level]).data))
 plt.xlabel('Time [' + time_offset_radar_refl.units + ']')
 plt.ylabel('Copolar radar reflectivity')
-plt.title('Height = %s m' %height[range_level] )
+plt.title('Height = %s m.  Stdev. = %s dBZ. Sk = %s' \
+            % ( height[range_level], std(reflCompressed), skew(reflCompressed) )  )
 
 #pdb.set_trace()
 
