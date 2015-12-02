@@ -4,7 +4,7 @@
 """
 
 # Import libraries
-from numpy import fmax, arange, meshgrid, ix_, sqrt, mean, var, std 
+from numpy import fmax, arange, meshgrid, ix_, sqrt, mean, var, std, sum 
 from numpy import linspace, asarray, sort, amin, zeros, isclose
 from numpy.ma import masked_where, filled
 from numpy.ma import MaskedArray
@@ -74,6 +74,8 @@ if (radarType == "arscl"):
     minThreshRefl = -60
 else:
     minThreshRefl = -30
+# An estimate of within-cloud liquid water path, in g/m**2
+meanLWP = 10 
     
     
 # Now overwrite defaults with specialized values for particular days
@@ -148,13 +150,15 @@ elif date == 20150607:
     beginTimeOfPlot = 68000
     endTimeOfPlot = 80000
     # Time at which profile of reflectivity is plotted
-    time_of_cloud = 71000 #78410# 78800 #78450
+    time_of_cloud = 71000 #78410 #78800 #78450
     # Range of times in seconds for vertical overlap analysis
-    beginTimeOfCloud = 70000#70000#78000
+    beginTimeOfCloud = 70000 #70000#78000
     endTimeOfCloud = 79000 #72000#79000
     # Range of altitudes in meters for vertical overlap analysis
     cloudBaseHeight = 2250#2500
     cloudTopHeight = 2600#2800
+    # An estimate of within-cloud liquid water path, in g/m**2
+    meanLWP = 10
 elif date == 20150609:
     radarType = "arscl"
     # Radar could see strong clouds up to 8 km on 20131205:
@@ -176,6 +180,8 @@ elif date == 20150609:
     # Range of altitudes in meters for vertical overlap analysis
     cloudBaseHeight = 2600
     cloudTopHeight = 3500
+    # An estimate of within-cloud liquid water path, in g/m**2
+    meanLWP = 8 
 elif date == 20150627:
     radarType = "arscl"
     # Radar could see strong clouds up to 8 km on 20131205:
@@ -199,6 +205,8 @@ elif date == 20150627:
     # Range of altitudes in meters for vertical overlap analysis
     cloudBaseHeight = 2200
     cloudTopHeight = 3500
+    # An estimate of within-cloud liquid water path, in g/m**2
+    meanLWP = 20 
 else:
     print "Wrong date"
 
@@ -284,6 +292,8 @@ reflRange = linspace(minRefl,maxRefl)
 # Compute the standard deviation in the sum
 reflCloudBlockMin = amin(reflCloudBlock)
 reflCloudBlockOffset = reflCloudBlock - reflCloudBlockMin
+# Sum reflectivities in vertical, and then compute within-cloud mean
+meanReflCloudBlock = mean(sum(reflCloudBlockOffset,axis=1))
 reflCloudBlockFilled = filled(reflCloudBlockOffset,fill_value=0)
 # Compute maximal overlap by sorting each altitude level individually
 reflCloudBlockFilledSorted = zeros((lenTimestepRangeCloud,lenLevelRangeCloud))
@@ -294,18 +304,22 @@ if ( not( isclose( mean( mean(reflCloudBlockFilled) ), mean( mean(reflCloudBlock
     print "ERROR: Computing maximal overlap failed!!! %s != %s" \
             % (mean( mean(reflCloudBlockFilled) ) , mean( mean(reflCloudBlockFilledSorted) ))  
     sys.exit(1)
+
+#pdb.set_trace()
     
-meanAlbedoUnsorted, LWCUnsorted, stdLWCUnsorted \
-                = calcMeanAlbedo(reflCloudBlockFilled)
+meanAlbedoUnsorted, LWPUnsorted \
+                = calcMeanAlbedo(reflCloudBlockFilled, meanReflCloudBlock, meanLWP)
 
-meanAlbedoSorted, LWCSorted, stdLWCSorted \
-                 = calcMeanAlbedo(reflCloudBlockFilledSorted)
+meanAlbedoSorted, LWPSorted \
+                 = calcMeanAlbedo(reflCloudBlockFilledSorted, meanReflCloudBlock, meanLWP)
 
-print "            Unsorted       Sorted"
+#pdb.set_trace()
+
+print "              Unsorted    Sorted"
 print "Mean Albedo:  %s   %s " %(meanAlbedoUnsorted,  meanAlbedoSorted)
-print "Stdev LWC:    %s   %s "   %(stdLWCUnsorted,  stdLWCSorted)
+print "Relative fractional difference:  %s" %( (meanAlbedoUnsorted-meanAlbedoSorted)/meanAlbedoUnsorted )
 
-pdb.set_trace()
+
 
 #exit
 TIME, HEIGHT = meshgrid(height[height_range], 

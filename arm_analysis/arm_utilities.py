@@ -141,7 +141,7 @@ def findKSDn(cdf1, cdf2):
             
     return Dn
     
-def calcMeanAlbedo(reflCloudBlockFilled):
+def calcMeanAlbedo(reflCloudBlockFilled, meanReflCloudBlock, meanLWP):
     """Calculate mean albedo of cloud layer, which depends on vertical overlap.
     
     Inputs:
@@ -149,25 +149,28 @@ def calcMeanAlbedo(reflCloudBlockFilled):
                            Out-of-cloud values are filled with 0.
                            Each column is an altitude level.  
                            Each row is a vertical profile at a different time.
-    reflCloudBlockMin = minimum of all cloud elements of reflCloudBlockFilled
+    meanReflCloudBlock = within-cloud mean of reflCloudBlock
+    meanLWP = within-cloud mean of LWP
     
     Output:
     meanAlbedo = average reflectivity of cloud layer"""
 
-    from numpy import std, sqrt, mean 
+    from numpy import std, sqrt, mean, sum 
     import pdb
 
     # Sum reflectivity in vertical
-    meanReflCloudBlockFilled = mean(reflCloudBlockFilled,axis=1) 
-    # LWC = Liquid water content
-    LWC = sqrt(meanReflCloudBlockFilled) 
-    stdLWC = std(LWC)
+    sumReflCloudBlockFilled = sum(reflCloudBlockFilled,axis=1) 
+    # LWP = Liquid water path. Assume it is linearly proportional to refl.
+    LWP = meanLWP * sumReflCloudBlockFilled / meanReflCloudBlock
     # tau = optical depth
-    tau = LWC**(2.0/3.0)
+    # According to Brenguier et al. (2011), tau ~= 0.15 LWP, 
+    # where LWP is in g/m**2. 
+    # According to Hartmann et al. (1992), tau ~= 9 for medium clouds
+    tau = 0.15 * LWP
     # albedo = cloud reflectivity, 0 <= albedo <= 1
     albedo = tau / (9.0 + tau)
     meanAlbedo = mean(albedo)
     
     #pdb.set_trace()
     
-    return (meanAlbedo, LWC, stdLWC)
+    return (meanAlbedo, LWP)
