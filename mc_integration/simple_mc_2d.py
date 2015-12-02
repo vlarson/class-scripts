@@ -97,7 +97,7 @@ def calcNormalLognormalPDFValues(samplePoints,muN,sigmaN,muLNn,sigmaLNn,rhon):
     rhon = correlation between the 2 variates, transformed to normal space
     """
 
-    from numpy import zeros, exp, dot, copy, multiply, sqrt, log, pi
+    from numpy import exp, multiply, sqrt, log, pi
 
     xN = samplePoints[:,0]     # Column of normally distributed sample points
     xLN = samplePoints[:,1]    # Column of lognormally distributed sample points, 
