@@ -4,8 +4,9 @@
 """
 
 # Import libraries
+from __future__ import division # in order to divide two integers
 from numpy import fmax, arange, meshgrid, ix_, sqrt, mean, var, std, sum 
-from numpy import linspace, asarray, sort, amin, zeros, isclose
+from numpy import linspace, asarray, sort, amin, zeros, isclose, count_nonzero
 from numpy.ma import masked_where, filled
 from numpy.ma import MaskedArray
 from math import pi, log
@@ -16,6 +17,7 @@ from scipy.io import netcdf
 from arm_utilities import plotSfcRad, findTruncNormalRoots, findKSDn, calcMeanAlbedo
 import pdb
 import sys
+
 
 # Point to directory containing ARM observations 
 data_dir = '/home/studi/Larson/arm_data_files/'
@@ -313,13 +315,32 @@ meanAlbedoUnsorted, LWPUnsorted \
 meanAlbedoSorted, LWPSorted \
                  = calcMeanAlbedo(reflCloudBlockFilledSorted, meanReflCloudBlock, meanLWP)
 
+# Now consider a case in which there is no within-cloud variability
+# mean within-cloud optical depth
+tauWc0 = 0.15 * meanLWP
+# mean within-cloud albedo
+albedoWc0 = tauWc0 / (9.0 + tauWc0)
+# Find cloud cover
+sumReflCloudBlockFilled = sum(reflCloudBlockFilled,axis=1)
+cloudCover = count_nonzero(sumReflCloudBlockFilled)/len(sumReflCloudBlockFilled)
+# mean albedo, including clear air
+meanAlbedo0 = albedoWc0 * cloudCover
+
+# Assertion check
+if ( not( isclose( meanReflCloudBlock * cloudCover , mean(sumReflCloudBlockFilled) ) ) ):
+    print "ERROR: Computing maximal overlap failed!!! %s != %s" \
+            % ( meanReflCloudBlock * cloudCover , mean(sumReflCloudBlockFilled) )  
+    sys.exit(1)
+
 #pdb.set_trace()
 
-print "              Unsorted    Sorted"
-print "Mean Albedo:  %s   %s " %(meanAlbedoUnsorted,  meanAlbedoSorted)
-print "Relative fractional difference:  %s" %( (meanAlbedoUnsorted-meanAlbedoSorted)/meanAlbedoUnsorted )
-
-
+print "                                 Unsorted    Sorted   No within-cloud variability"
+print "Mean Albedo:                     %.5f   %.5f   %.5f" %(meanAlbedoUnsorted,  meanAlbedoSorted, meanAlbedo0)
+print "Relative fractional difference:  %.5f   %.5f   %.5f" \
+       %( 0, 
+        (meanAlbedoUnsorted-meanAlbedoSorted)/meanAlbedoUnsorted,
+        (meanAlbedo0-meanAlbedoSorted)/meanAlbedoUnsorted
+         )
 
 #exit
 TIME, HEIGHT = meshgrid(height[height_range], 
