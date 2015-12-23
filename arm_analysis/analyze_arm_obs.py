@@ -10,7 +10,7 @@ from numpy import linspace, asarray, sort, amin, zeros, isclose, count_nonzero
 from numpy.ma import masked_where, filled
 from numpy.ma import MaskedArray
 from math import pi, log
-from scipy.stats import norm, lognorm, skew
+from scipy.stats import norm, lognorm, skew, spearmanr
 from scipy.stats.mstats import rankdata
 import matplotlib.pyplot as plt
 from scipy.io import netcdf
@@ -342,6 +342,15 @@ print "Relative fractional difference:  %.5f   %.5f   %.5f" \
         (meanAlbedo0-meanAlbedoSorted)/meanAlbedoUnsorted
          )
 
+# Compute Spearman's rank correlation matrix 
+# among reflectivity at different vertical levels.
+# I'm not sure about the following calculation because 
+# I don't understand a correlation of a masked array.
+spearmanMatrix, spearmanPval = spearmanr(reflCloudBlock, axis=0)
+
+print "Spearman rank correlation matrix:"
+print spearmanMatrix
+
 #exit
 TIME, HEIGHT = meshgrid(height[height_range], 
                         time_offset_radar_refl[time_range]) 
@@ -384,6 +393,16 @@ for col in range(0,lenLevelRangeCloud):
                                 MaskedArray.count(reflCloudBlock[:,col])
 
 uniformCloudBlock = masked_where( uniformCloudBlock == 0, uniformCloudBlock )
+# I'm not sure if it's appropriate to rank first, then fill.
+# So I'm not sure if this is correct.
+uniformCloudBlockFilled = filled(uniformCloudBlock,fill_value=0)
+
+plt.clf()
+for idx in range(1,5):
+    plt.subplot(2,2,idx)
+    plt.plot(uniformCloudBlockFilled[:,5],uniformCloudBlockFilled[:,idx],'.')
+plt.title('Copula')
+plt.figure()
 
 #pdb.set_trace()
 #plt.ion() # Use interactive mode so that program continues when plot appears
@@ -406,6 +425,14 @@ plt.xlabel('Uniform distribution of reflectivity')
 plt.ylabel('Altitude  [m]')
 plt.figure()
 
+plt.subplot(121)
+for idx in range(0,numProfiles):
+    plt.plot(spearmanMatrix[:,idx],
+             height[levelRangeCloud],'-o')
+plt.ylim(height[levelRangeCloud[0]], height[levelRangeCloud[len(levelRangeCloud)-1]])
+plt.xlabel('Spearman rank correlations  [-]')
+plt.ylabel('Altitude  [m]')
+plt.figure()
 
 
 #plt.clf()
