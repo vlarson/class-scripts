@@ -33,13 +33,13 @@ def calcFncValues(numSamples,fncDim,samplePoints,fncIntegrand,*args):
 
     # Assertion check: see if samplePoints has numSamples rows and fncDim columns
     if samplePoints.shape[0] != numSamples:
-        print "Error: normalPoints does not have numSample rows in function calcFncValues."
+        print("Error: normalPoints does not have numSample rows in function calcFncValues.")
     if (samplePoints.ndim == 1):
         if (fncDim != 1):
-            print "Error: normalPoints has 1 column but fncDim != 1 in function calcFncValues."
+            print("Error: normalPoints has 1 column but fncDim != 1 in function calcFncValues.")
     if (samplePoints.ndim > 1):
         if (samplePoints.shape[1] != fncDim):
-            print "Error: normalPoints does not have fncDim columns in function calcFncValues."    
+            print("Error: normalPoints does not have fncDim columns in function calcFncValues.")    
 
 #    fncValuesArray = zeros((numSamples,fncDim))
     fncValuesArray = zeros(numSamples)

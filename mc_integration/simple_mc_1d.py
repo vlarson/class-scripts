@@ -43,7 +43,7 @@ def computeRmseN(numSamples):
     mcIntegral = zeros(numExperiments)
 
     analyticIntegral =  calcAnalyticIntegral(sigma,fncExpnt)   
-    print "Analytic calculation of integral = %s" % analyticIntegral
+    print("Analytic calculation of integral = %s" % analyticIntegral)
 
     for idx in arange(numExperiments):
 
@@ -61,7 +61,7 @@ def computeRmseN(numSamples):
         
     
     rmse = computeRmse(analyticIntegral,mcIntegral)
-    print "RMSE of Monte Carlo estimate = %s" % rmse
+    print("RMSE of Monte Carlo estimate = %s" % rmse)
     
     return rmse    
     
@@ -72,12 +72,12 @@ def main():
     numNValues = 10
 
     rmseNValues = zeros(numNValues)    
-    numSamplesN = zeros(numNValues)
+    numSamplesN = zeros(numNValues).astype(int)
 
     
     for idx in arange(numNValues):    
         numSamplesN[idx] = 2**(idx+2)
-        print "numSamplesN = %s" % numSamplesN[idx]
+        print("numSamplesN = %s" % numSamplesN[idx])
         rmseNValues[idx] = computeRmseN(numSamplesN[idx])
     
     theoryError = 100.0/sqrt(numSamplesN)    

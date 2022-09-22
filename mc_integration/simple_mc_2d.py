@@ -285,7 +285,7 @@ def computeFracRmseN(numSamples):
         ############################################
 
         # Number of samples drawn from q(x) ( and not P(x) ) in defensive importance sampling
-        numSamplesDefQ = floor( alphaDefQ * numSamples ) 
+        numSamplesDefQ = floor( alphaDefQ * numSamples ).astype(int) 
 
         # Number of samples drawn from q(x) ( and not P(x) ) in defensive importance sampling
         numSamplesDefP = numSamples-numSamplesDefQ 
@@ -304,7 +304,7 @@ def computeFracRmseN(numSamples):
                                     
         # Assertion check:
         if ( samplePointsQ.shape != samplePoints.shape  ):
-            print "ERROR: Defensive importance sampling generates the wrong number of sample points!!!!" 
+            print("ERROR: Defensive importance sampling generates the wrong number of sample points!!!!") 
             sys.exit(1)        
 
         fncValuesArrayQ = calcFncValues(numSamples,fncDim,samplePointsQ,
@@ -335,15 +335,15 @@ def computeFracRmseN(numSamples):
         #pdb.set_trace()
    
     fracRmse = computeRmse(analyticIntegral,mcIntegral)/analyticIntegral
-    print "Fractional RMSE of Monte Carlo estimate = %s" % fracRmse
+    print("Fractional RMSE of Monte Carlo estimate = %s" % fracRmse)
 
 #    pdb.set_trace()
     
     fracRmseImp = computeRmse(analyticIntegral,mcIntegralImp)/analyticIntegral
-    print "Fractional RMSE of Monte Carlo estimate = %s" % fracRmse    
+    print("Fractional RMSE of Monte Carlo estimate = %s" % fracRmse)    
     
     fracRmseCV = computeRmse(analyticIntegral,mcIntegralCV)/analyticIntegral
-    print "Fractional RMSE of CV Monte Carlo estimate = %s" % fracRmseCV    
+    print("Fractional RMSE of CV Monte Carlo estimate = %s" % fracRmseCV)    
 
 #    if isnan(fracRmseCV):
 #    pdb.set_trace
@@ -370,11 +370,11 @@ def main():
     fracRmseNValuesImp = zeros(numNValues)
     fracRmseNValuesCV = zeros(numNValues)
     corrCVNValues = zeros(numNValues)
-    numSamplesN = zeros(numNValues)
+    numSamplesN = zeros(numNValues).astype(int)
     
     for idx in arange(numNValues):    
         numSamplesN[idx] =  2**(idx+2)
-        print "numSamplesN = %s" % numSamplesN[idx]
+        print("numSamplesN = %s" % numSamplesN[idx])
         fracRmseNValues[idx], fracRmseNValuesImp[idx], fracRmseNValuesCV[idx], \
         corrCVNValues[idx] =  \
             computeFracRmseN(numSamplesN[idx])
