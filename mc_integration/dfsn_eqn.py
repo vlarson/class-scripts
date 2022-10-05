@@ -7,15 +7,20 @@ import pdb
 
 
 def calcMean(K, qt_init, dz, nz, dt, nt):
+    """
+    Solve a diffusion equation for the grid-mean total water, qt_alltimes,
+    given an initial profile, qt_init.
+    Assume zero moisture flux at the top and bottom of the domain.
+    
+    Reference: http://hplgit.github.io/num-methods-for-PDEs/doc/pub/diffu/sphinx/._main_diffu001.html#forward-euler-scheme
+    Reference: http://hplgit.github.io/num-methods-for-PDEs/doc/pub/nonlin/sphinx/._main_nonlin004.html#finite-difference-discretization-1
 
-# Reference: http://hplgit.github.io/num-methods-for-PDEs/doc/pub/diffu/sphinx/._main_diffu001.html#forward-euler-scheme
-# Reference: http://hplgit.github.io/num-methods-for-PDEs/doc/pub/nonlin/sphinx/._main_nonlin004.html#finite-difference-discretization-1
-
-#  nz = number of full vertical grid levels
-#  K = Eddy diffusivity,  interface levels, 0 to nz
-#  qt_init = initial qt profile, full levels, 0 to nz-1
-#  dt = time step intervals
-#  nt = number of time steps
+    nz = number of full vertical grid levels
+    K = Eddy diffusivity,  interface levels, 0 to nz
+    qt_init = initial qt profile, full levels, 0 to nz-1
+    dt = time step intervals
+    nt = number of time steps
+    """
 
     import numpy as np
     import pdb
@@ -49,10 +54,13 @@ def calcMean(K, qt_init, dz, nz, dt, nt):
     return qt_alltimes
  
 def calcVariance(K, qt_alltimes, dz, nz, nt):
-
-# Reference: http://hplgit.github.io/num-methods-for-PDEs/doc/pub/diffu/sphinx/._main_diffu001.html#forward-euler-scheme
-# Reference: http://hplgit.github.io/num-methods-for-PDEs/doc/pub/nonlin/sphinx/._main_nonlin004.html#finite-difference-discretization-1
-
+    """
+    Diagnose the variance of total water, qt2_alltimes, given
+    the grid-mean profile of total water, qt_alltimes. 
+    
+    Reference: http://hplgit.github.io/num-methods-for-PDEs/doc/pub/diffu/sphinx/._main_diffu001.html#forward-euler-scheme
+    Reference: http://hplgit.github.io/num-methods-for-PDEs/doc/pub/nonlin/sphinx/._main_nonlin004.html#finite-difference-discretization-1
+    """
     import numpy as np
 
     # Eddy turnover time
@@ -70,7 +78,10 @@ def calcVariance(K, qt_alltimes, dz, nz, nt):
     return qt2_alltimes
    
 def main():
-    
+    """ Solve a minimal closure model.   Namely, integrate forward in time 
+    a prognostic equation for total water and a diagnostic equation 
+    for total water variance.  
+    """
     import numpy as np 
     import math
     import matplotlib.pyplot as plt
